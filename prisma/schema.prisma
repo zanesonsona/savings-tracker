@@ -10,4 +10,51 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Models are defined in T03 (see Project_state.md §5 "Data model").
+model Category {
+  id             Int            @id @default(autoincrement())
+  name           String         @unique
+  percentage     Float
+  kind           String         @default("EXPENSE") // "EXPENSE" | "SAVINGS" (validated in API)
+  color          String?
+  createdAt      DateTime       @default(now())
+  expenses       Expense[]
+  savingsEntries SavingsEntry[]
+}
+
+model Income {
+  id          Int      @id @default(autoincrement())
+  amountCents Int
+  source      String?
+  date        DateTime // UTC midnight
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  amountCents Int
+  date        DateTime
+  note        String?
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+  @@index([categoryId])
+}
+
+model SavingsEntry {
+  id          Int      @id @default(autoincrement())
+  amountCents Int
+  direction   String // "DEPOSIT" | "WITHDRAWAL"
+  date        DateTime
+  note        String?
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+  @@index([categoryId])
+}

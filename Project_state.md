@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T02 — Add Prisma + SQLite + zod + vitest · **Progress:** 1/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T03 — Prisma schema + initial migration · **Progress:** 2/16 tasks
 
 ### 1. Vision
 
@@ -163,7 +163,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria:** `npm run dev` serves the default page; `npm run build` and `npm run lint` pass; initial commit exists.
 
 #### T02 — Add Prisma + SQLite + zod + vitest
-**Status:** ⬜ TODO · **Depends on:** T01 · **Files:** `lib/prisma.ts`, `vitest.config.ts`, `package.json`, `.env.example`
+**Status:** ✅ DONE · **Depends on:** T01 · **Files:** `lib/prisma.ts`, `vitest.config.ts`, `package.json`, `.env.example`
 - Install: `npm i @prisma/client zod` · `npm i -D prisma vitest tsx`.
 - `npx prisma init --datasource-provider sqlite` → `.env` gets `DATABASE_URL="file:./dev.db"`; add committed `.env.example` with the same line.
 - Add PrismaClient singleton `lib/prisma.ts` (cache on `globalThis` to survive dev hot-reload).
@@ -314,6 +314,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 |------|------|-------|-----------------|
 | 2026-10-16 | PM | Project Manager | Created plan PM v1: vision, decisions D1–D13, data model, API contract, 16-task backlog (T01–T16). Next: T01. |
 | 2026-10-17 | T01 | Full-stack Developer | Scaffolded Next.js 16.4.2 app (App Router, TS, Tailwind v4, ESLint); extended .gitignore (*.db, !.env.example); git init + commit `ed21810`. Verified build/lint/dev (HTTP 200). Details in §"Full-stack Developer". |
+| 2026-10-17 | T02 | Full-stack Developer | Added Prisma 6.19.3 + SQLite + zod 4 + vitest 5 + tsx; `lib/prisma.ts` singleton; scripts (test/db:*); `.env.example`. `npx prisma -v`, `npm test`, lint, build all green; commit `928b0c2`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -321,6 +322,10 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 - 2026-10-17 · T01 · Dev toolchain installed **inside WSL Debian** (Node v24.22.0 LTS via official tarball into `/usr/local`, git 2.47.3 + curl via apt). All project commands run in WSL, not Windows node. · reason: repo lives on the ext4 Linux filesystem; native deps (Prisma engines, Turbopack, SWC) need Linux binaries and Windows/UNC tooling would break them.
 - 2026-10-17 · T01 · Repo-local git identity `Full-stack Developer <dev@todo-app.local>` for task commits (D12). · reason: agent commits need an identity; user's global git config left untouched.
+- 2026-10-17 · T02 · **Prisma pinned to 6.19.3** (`prisma` + `@prisma/client`), not npm "latest" (currently an 8.0.0-rc prerelease; v7+ requires driver-adapter deps beyond D11). v6 delivers exactly the §4/§5 workflow (`prisma migrate dev`, `.env` DATABASE_URL, `@prisma/client` import). · reason: keeps D11 dependency list exact; plan implementable without PM approval.
+- 2026-10-17 · T02 · `npx prisma init` delegated to a remote helper that generated Prisma-7-style scaffolding (`prisma.config.ts`, `prisma-client` generator). Removed `prisma.config.ts` and set generator `prisma-client-js` manually. · reason: `prisma.config.ts` imports `dotenv` (not allowed by D11); classic layout matches §4 (client import from `@prisma/client`).
+- 2026-10-17 · T02 · Bumped dev dep `@types/node` ^20 → ^24.19.2. · reason: vitest 5 peer-requires @types/node ≥22; also matches Node 24 runtime. No new packages added.
+- 2026-10-17 · T02 · `.env` kept local/gitignored, committed `.env.example` instead. Verified Next ("Environments: .env") and Prisma CLI both auto-load it. · reason: §4 requirement + T02 spec.
 
 ### 13. Open questions (for the human)
 
@@ -346,3 +351,16 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
   - `npm run dev` → `GET / 200` in 212ms; default page HTML served.
   - `git log --oneline` → single initial commit `ed21810`; working tree clean.
 - **Acceptance criteria (§8 T01):** ✅ dev serves default page · ✅ build passes · ✅ lint passes · ✅ initial commit exists.
+
+### T02 — Add Prisma + SQLite + zod + vitest ✅
+- **Commit:** `928b0c2 T02: add Prisma + SQLite + zod + vitest`
+- **Dependencies added:** runtime `@prisma/client@^6.19.3`, `zod@^4.6.7`; dev `prisma@^6.19.3`, `vitest@^5.0.5`, `tsx@^4.23.15`; dev bump `@types/node` ^20 → ^24.19.2 (vitest 5 peer; matches Node 24 runtime).
+- **Files:** `lib/prisma.ts` (globalThis-cached PrismaClient singleton), `vitest.config.ts` (node env, `passWithNoTests: true` until T04), `.env` (gitignored) + committed `.env.example` (`DATABASE_URL="file:./dev.db"`), `prisma/schema.prisma` (generator `prisma-client-js`, sqlite datasource; models land in T03), package.json scripts: `test`, `test:watch`, `db:migrate`, `db:studio`, `db:seed`.
+- **Judgment call:** Prisma pinned to **6.x** — npm `latest` is an 8.0.0-rc prerelease and v7+ needs driver-adapter packages outside D11; v6 matches the plan's workflow exactly. `prisma init`'s remote helper emitted v7-style `prisma.config.ts` + `prisma-client` generator → removed/replaced with classic v6 layout.
+- **Verification evidence:**
+  - `npx prisma -v` → exit 0; "Environment variables loaded from .env"; CLI 6.19.3 / client 6.19.3.
+  - `npx prisma generate` → exit 0 ("Generated Prisma Client (v6.19.3) to ./node_modules/@prisma/client").
+  - `npm test` → exit 0 ("No test files found, exiting with code 0").
+  - `npm run lint` → exit 0 · `npm run build` → exit 0 (build shows "Environments: .env").
+- **Known cosmetic warning:** vitest prints a Vite "configLoader" warning about ESM syntax in `vitest.config.ts` (CJS context). Harmless; may be eliminated in T15 polish (e.g. `vitest.config.mts`) if still noisy.
+- **Acceptance criteria (§8 T02):** ✅ `npx prisma -v` works · ✅ `npm test` exits 0 · ✅ `npm run build` still passes.
