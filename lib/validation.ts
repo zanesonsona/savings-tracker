@@ -116,6 +116,15 @@ export const expenseCreateSchema = z.object({
   note: noteSchema,
 });
 
+/** POST /api/savings body. */
+export const savingsCreateSchema = z.object({
+  amountCents: moneyAmountSchema,
+  direction: savingsDirectionSchema,
+  date: dateSchema,
+  categoryId: categoryIdSchema,
+  note: noteSchema,
+});
+
 /** Normalize an optional trimmed string to `string | null`. */
 export function emptyToNull(value: string | undefined): string | null {
   return value?.trim() ? value.trim() : null;

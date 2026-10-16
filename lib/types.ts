@@ -169,3 +169,26 @@ export function toExpenseDTO(expense: {
     createdAt: expense.createdAt.toISOString(),
   };
 }
+
+/** Map a Prisma SavingsEntry (with its included category) to the JSON DTO shape. */
+export function toSavingsEntryDTO(entry: {
+  id: number;
+  amountCents: number;
+  direction: string;
+  date: Date;
+  note: string | null;
+  categoryId: number;
+  category: { id: number; name: string; kind: string; color: string | null };
+  createdAt: Date;
+}): SavingsEntryDTO {
+  return {
+    id: entry.id,
+    amountCents: entry.amountCents,
+    direction: entry.direction as SavingsDirection,
+    date: entry.date.toISOString(),
+    note: entry.note,
+    categoryId: entry.categoryId,
+    category: toCategoryRefDTO(entry.category),
+    createdAt: entry.createdAt.toISOString(),
+  };
+}

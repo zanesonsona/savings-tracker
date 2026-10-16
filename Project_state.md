@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T10 — Expense UI · **Progress:** 9/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T11 — Savings API · **Progress:** 10/16 tasks
 
 ### 1. Vision
 
@@ -226,7 +226,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria:** curl checks: happy path; savings-kind category rejected; unknown category 404; month+category filters combine.
 
 #### T10 — Expense UI
-**Status:** ⬜ TODO · **Depends on:** T09, T06 · **Files:** `app/expenses/page.tsx`, `components/*`
+**Status:** ✅ DONE · **Depends on:** T09, T06 · **Files:** `app/expenses/page.tsx`, `components/*`
 - Month filter (default current, prev/next), category filter, list grouped by date with category badge + note + amount, delete per row.
 - Form: amount, category select (EXPENSE-kind only), date (default today), note.
 - Empty states for no categories / no expenses.
@@ -322,6 +322,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T07 | Full-stack Developer | Incomes API: GET (newest first, `?month=` UTC filter, 400 on malformed), POST (int cents > 0, date → UTC midnight, source/note limits), DELETE. Shared validation fragments + `parseIdParam`; categories API refactored onto it. 30/30 curl checks PASS incl. year boundary + UTC-midnight storage; commit `25b7ebc`. |
 | 2026-10-17 | T08 | Full-stack Developer | Income UI: amount (`toCents`) / source / date / note form; month-grouped list newest-first with split chips (5000.00 @ 35/25/20/20 → 1750/1250/1000/1000) + Unallocated chip; delete w/ confirm; loading + empty states. New `lib/use-today.ts` hook (`useSyncExternalStore` — satisfies Next 16 `react-hooks/set-state-in-effect`). 19/19 script checks + 22/22 unit tests PASS; DB wiped; lint+build green; commit `8d97367`. |
 | 2026-10-17 | T09 | Full-stack Developer | Expenses API: GET (newest first, category embedded, `?month=`+`?categoryId=` combinable filters), POST (zod cents/date/categoryId/note; savings-kind → 400 `Use Savings entries for savings categories`; unknown category → 404), DELETE 204/404. `expenseCreateSchema` + `toExpenseDTO` added. 39/39 curl checks PASS; DB wiped; lint+build green; commit `927714d`. |
+| 2026-10-17 | T10 | Full-stack Developer | Expense UI: month prev/next (client-only default via new `lib/use-current-month.ts`), category filter, day-grouped list (badge + note + amount + delete w/ confirm), live count + total line, amount/category/date/note form (EXPENSE-kind only), empty states (no categories / no match / empty month). 17/17 script checks (SSR + UI query smoke) PASS; DB wiped; lint+build green; commit `cc8ff36`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -340,6 +341,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T06 · Removed the template's `prefers-color-scheme` auto-dark flip and standardized the app on a light slate theme (dark mode is out of scope) · reason: keep one consistent look; avoids half-styled rendering on dark OS themes.
 - 2026-10-17 · T08 · Date defaults ("today") come from a new `lib/use-today.ts` hook built on `useSyncExternalStore` (`""` server snapshot → local `YYYY-MM-DD` after hydration) instead of a mount `useEffect` + setState · reason: Next 16's `react-hooks/set-state-in-effect` lint rule rejects the effect pattern; the store hook is the React-blessed way to render a client-only value with no hydration mismatch, and T10/T12 date pickers will reuse it.
 - 2026-10-17 · T09 · POST `/api/expenses`: **404** for a nonexistent `categoryId`, **400** with `Use Savings entries for savings categories` for an existing SAVINGS-kind category · reason: §8 T09 acceptance says "unknown category 404"; the 400 message is mandated for the kind mismatch. GET merges both optional filters into one Prisma `where` (they combine).
+- 2026-10-17 · T10 · Expense page's default month is **client-only** (`lib/use-current-month.ts`, same `useSyncExternalStore` pattern as `useToday`) and prev/next use `shiftMonth` on UTC months (§7) · reason: a build-time prerendered `currentMonth()` could hydrate mismatched after a month rollover; blank-until-hydrated avoids it. Category filter only offers EXPENSE-kind categories.
 
 ### 13. Open questions (for the human)
 
@@ -351,7 +353,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 ## Full-stack Developer
 
-> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T09.
+> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T10.
 
 ### T01 — Scaffold Next.js app ✅
 - **Commit:** `ed21810 T01: scaffold Next.js app`
@@ -450,3 +452,12 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
   - `lib/types.ts` — adds `toExpenseDTO` (maps `Expense` + included category via `toCategoryRefDTO`).
 - **Verification evidence:** 39/39 curl checks PASS against `npm run dev`: happy 201s (Bills 2026-10-05 w/ note, Needs 2026-10-06 no note → `null`, Bills 2026-09-15); DTO carries `"date":"2026-10-05T00:00:00.000Z"` (UTC midnight) + embedded `"category":{…"name":"Bills","kind":"EXPENSE","color":"#ef4444"}`; SAVINGS category → 400 with exact message; categoryId 999999 → 404 `Category not found`; 400s for amount 0 / fractional cents / 2026-02-30 / missing categoryId / string categoryId / 201-char note; GET all → 3 rows newest-first; `?month=2026-10` → 2, `2026-09` → 1, `2026-11` → 0, `2026-13`/`2026-1` → 400; `?categoryId=<Bills>` → 2; **combined `month+categoryId` → 1**; unknown categoryId filter → `[]`; `categoryId=abc` → 400; DELETE 204 → repeat 404 → bad id 400 → count drops to 2. Wiped clean after (`category=0 … savings=0`). `npm test` 22/22; lint + build exit 0 (`/api/expenses*` build as ƒ Dynamic).
 - **Acceptance criteria (§8 T09):** ✅ happy path · ✅ savings-kind category rejected (exact message) · ✅ unknown category 404 · ✅ month + category filters combine.
+
+### T10 — Expense UI ✅
+- **Commit:** `cc8ff36 T10: expense UI with month + category filters`
+- **Files:**
+  - `app/expenses/page.tsx` — replaces the T06 stub: month filter bar (`← Prev` / month label / `Next →`, `aria-label`s, client-only default month), category filter select (EXPENSE-kind only, "All categories" default); add form (amount `toCents`, category select, date defaulting to local today, optional note; submit disabled until an expense category exists); day-grouped list (day heading + category color-dot badge + note + `formatCents` + delete w/ `window.confirm`); live "N expenses · Total $X" line that reflects the active filters; empty states: no expense categories (→ `/categories`), no filter matches, empty month; loading/error states.
+  - `lib/use-current-month.ts` — client-only month ("" SSR → UTC `YYYY-MM` after hydration; `useSyncExternalStore`), consistent with the §7 UTC month rule; `shiftMonth` drives prev/next.
+- **Verification evidence:** 17/17 script checks PASS against `npm run dev`: `/expenses` 200 with all static UI strings in SSR HTML ("Add expense", amount/note placeholders, "Previous month"/"Next month", "All categories", subheading) and the old "coming soon" stub text gone; seeded a Bills category + one expense dated in the current UTC month; the **exact queries the page issues** (`?month=<current>`, `?month=<current>&categoryId=<Bills>`) each return the 1 seeded row with embedded category. DB wiped → all counts 0. `npm test` 22/22; lint + build exit 0 (`/expenses` ○ static).
+- **Deferred to QA (T16):** browser click-through of add → list/total updates, prev/next month navigation, category filter combining, delete (data rendering is client-side after fetch; the query layer + API paths are covered here and in T09).
+- **Acceptance criteria (§8 T10):** ✅ add/list/delete wired (form + handlers implemented; API fully curl-verified in T09) · ✅ filters combine (same query the page builds is curl-verified: month+categoryId) · ✅ totals change accordingly (total line recomputed from the filtered response on every reload; visual check deferred to QA).
