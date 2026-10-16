@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T05 — Categories API · **Progress:** 4/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T06 — Categories UI + navigation + page stubs · **Progress:** 5/16 tasks
 
 ### 1. Vision
 
@@ -187,7 +187,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria:** `npm test` green; remove `passWithNoTests`.
 
 #### T05 — Categories API
-**Status:** ⬜ TODO · **Depends on:** T03, T04 · **Files:** `app/api/categories/route.ts`, `app/api/categories/[id]/route.ts`, `lib/validation.ts`, `lib/types.ts`
+**Status:** ✅ DONE · **Depends on:** T03, T04 · **Files:** `app/api/categories/route.ts`, `app/api/categories/[id]/route.ts`, `lib/validation.ts`, `lib/types.ts`
 - zod schemas in `lib/validation.ts`: `name` trimmed 1–40 chars; `percentage` number 0–100, max 2 decimals (`.multipleOf(0.01)` or refine); `kind` in `["EXPENSE","SAVINGS"]`; `color` optional `#RRGGBB`.
 - GET → `Category[]` (order by id). POST → create; reject if name exists case-insensitively (409) or if `Σ existing + new > 100.01` (400 with message like `Total allocation cannot exceed 100% (would be 105%)`).
 - PATCH → update name/percentage/kind/color with the same checks (exclude self from Σ).
@@ -317,6 +317,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T02 | Full-stack Developer | Added Prisma 6.19.3 + SQLite + zod 4 + vitest 5 + tsx; `lib/prisma.ts` singleton; scripts (test/db:*); `.env.example`. `npx prisma -v`, `npm test`, lint, build all green; commit `928b0c2`. |
 | 2026-10-17 | T03 | Full-stack Developer | Wrote the 4 §5 models (String kind/direction, no enums); `prisma migrate dev --name init` created `prisma/dev.db` + `20261016160931_init`; client counts all 4 tables = 0; build green; commit `b287122`. |
 | 2026-10-17 | T04 | Full-stack Developer | `lib/constants.ts` (APP_CURRENCY/APP_LOCALE), `money.ts` (toCents/formatCents), `allocation.ts` (splitIncome §7 largest remainder), `dates.ts` (parseMonth/parseDate/formatDate/monthLabel/currentMonth/shiftMonth). 21 unit tests green (incl. §8 cases + randomized invariant); lint+build green; commit `6c69de5`. |
+| 2026-10-17 | T05 | Full-stack Developer | Categories API GET/POST + PATCH/DELETE on `[id]`; zod validation (§6 error shape), case-insensitive name checks, Σ%>100.01 guard, 404/409/204 paths. 25/25 curl checks PASS; DB wiped clean after; lint+build green (routes build as ƒ Dynamic); commit `a2ddb5c`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -329,6 +330,9 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T02 · Bumped dev dep `@types/node` ^20 → ^24.19.2. · reason: vitest 5 peer-requires @types/node ≥22; also matches Node 24 runtime. No new packages added.
 - 2026-10-17 · T02 · `.env` kept local/gitignored, committed `.env.example` instead. Verified Next ("Environments: .env") and Prisma CLI both auto-load it. · reason: §4 requirement + T02 spec.
 - 2026-10-17 · T04 · `formatCents` uses a fixed `en-US` locale + `APP_CURRENCY` and `currentMonth()` uses **UTC** parts · reason: deterministic tests/rendering; consistent with D13 (dates stored as UTC midnights). Currency switch in Q1 stays a one-constant change.
+- 2026-10-17 · T05 · GET `/api/categories` includes additive `expenseCount`/`savingsCount` (Prisma `_count`) and `createdAt` · reason: T06 needs usage counts for the list + delete-blocked preview; additive fields don't change the §6 contract.
+- 2026-10-17 · T05 · Σ% guard implemented in basis points: reject when `sumBp > 10001` (= 100.01%), exactly as §8 T05 says; duplicate-name checks are exact case-insensitive comparisons (`"Bills"`/`"bills"` collide) · reason: SQLite `@unique` is case-sensitive (no `mode:"insensitive"` on SQLite).
+- 2026-10-17 · T05 · Validation errors return the first zod issue as `"<field>: <message>"` in `{ error }` (§6 shape); PATCH requires at least one field · reason: stays human-readable while identifying the offending field.
 
 ### 13. Open questions (for the human)
 
@@ -385,3 +389,14 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Test suite:** 21 tests across 3 files — includes every §8 T04 case: `[33,33,34]` @ 100¢/33.33-33.33-33.34; `[1,0,0]` @ 1¢; Σ=80% → unallocated 20%; randomized 500-iteration invariant `Σ allocations + unallocated == amountCents`; parseMonth Dec→Jan year boundary; tie-break by lower id; money edge cases (`1.005`→101, `0.1+0.2`→30).
 - **Verification evidence:** `npx vitest run --reporter=verbose` → 3 files / 21 tests passed, exit 0; `npm run lint` exit 0; `npm run build` exit 0.
 - **Acceptance criteria (§8 T04):** ✅ all listed cases green · ✅ `npm test` green · ✅ `passWithNoTests` removed.
+
+### T05 — Categories API ✅
+- **Commit:** `a2ddb5c T05: categories API`
+- **Files:**
+  - `lib/validation.ts` — zod v4 schemas: `categoryNameSchema` (trimmed 1–40), `percentageSchema` (0–100, `.multipleOf(0.01)`), `categoryKindSchema` (`EXPENSE|SAVINGS`, default EXPENSE), `colorSchema` (`#RRGGBB`, nullable on update), `categoryCreateSchema`, `categoryUpdateSchema` (≥1 field), `zodErrorMessage` (first issue as `"<field>: <message>"`).
+  - `lib/types.ts` — all DTO types (Category/Income/Expense/SavingsEntry/SavingsList/Overview + `ApiError`) and `toCategoryDTO`/`toCategoryRefDTO` mappers (ISO dates; `kind`/`direction` string unions per §4).
+  - `app/api/categories/route.ts` — GET (order by id, `_count` included) / POST (case-insensitive duplicate → 409; Σ% in basis points > 100.01 → 400 `Total allocation cannot exceed 100% (would be X%)`; 201 DTO).
+  - `app/api/categories/[id]/route.ts` — PATCH (same duplicate/Σ checks excluding self; 400/404/409; returns DTO) / DELETE (409 listing counts when used, else 204); `RouteContext<"/api/categories/[id]">` async params (Next 16 convention).
+- **Verification evidence:** 25/25 curl checks PASS against `npm run dev` (recorded live): empty list `[]`; create Bills 201 + Needs 201; duplicate "bills" 409; Debts 45 → Σ105 400 with message; bad kind 400; Fun (SAVINGS) 201; PATCH →60 → 400; PATCH duplicate name → 409; PATCH rename+15 → 200; unknown id 404; empty PATCH 400; DELETE unused 204; DELETE with expense 409 `Cannot delete…`; DELETE unknown 404; invalid JSON 400; GET shows `"expenseCount":1`. Test rows wiped afterward → GET `[]` (fresh-install state, D3). `npm run lint` + `npm run build` exit 0 (routes compiled as `ƒ Dynamic`).
+- **Notes:** additive `expenseCount`/`savingsCount` in GET (used by T06 UI). Exact acceptance curl combos per §8 T05 all included above.
+- **Acceptance criteria (§8 T05):** ✅ happy create · ✅ duplicate name · ✅ Σ>100 · ✅ bad kind · ✅ PATCH pushing Σ over 100 · ✅ DELETE blocked + allowed · ✅ 404s.
