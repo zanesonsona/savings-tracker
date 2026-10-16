@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseDate } from "./dates";
 
 // String-union "enums" (§4 SQLite limitation) — keep in sync with lib/types.ts.
 export const CATEGORY_KINDS = ["EXPENSE", "SAVINGS"] as const;
@@ -51,4 +52,58 @@ export function zodErrorMessage(error: z.ZodError): string {
   if (!issue) return "Invalid input";
   const path = issue.path.join(".");
   return path ? `${path}: ${issue.message}` : issue.message;
+}
+
+/** Parse a positive integer id from a route param; null when invalid. */
+export function parseIdParam(raw: string): number | null {
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+// --- Shared request fragments (incomes / expenses / savings) ---
+
+export const moneyAmountSchema = z
+  .number()
+  .int("Amount must be a whole number of cents")
+  .positive("Amount must be greater than zero");
+
+export const monthSchema = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Month must be formatted as YYYY-MM");
+
+export const dateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be formatted as YYYY-MM-DD")
+  .refine((value) => {
+    try {
+      parseDate(value);
+      return true;
+    } catch {
+      return false;
+    }
+  }, "Invalid calendar date");
+
+export const sourceSchema = z
+  .string()
+  .trim()
+  .max(60, "Source must be 60 characters or fewer")
+  .optional();
+
+export const noteSchema = z
+  .string()
+  .trim()
+  .max(200, "Note must be 200 characters or fewer")
+  .optional();
+
+/** POST /api/incomes body. */
+export const incomeCreateSchema = z.object({
+  amountCents: moneyAmountSchema,
+  source: sourceSchema,
+  date: dateSchema,
+  note: noteSchema,
+});
+
+/** Normalize an optional trimmed string to `string | null`. */
+export function emptyToNull(value: string | undefined): string | null {
+  return value?.trim() ? value.trim() : null;
 }

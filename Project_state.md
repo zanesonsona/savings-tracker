@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T06 — Categories UI + navigation + page stubs · **Progress:** 5/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T07 — Income API · **Progress:** 6/16 tasks
 
 ### 1. Vision
 
@@ -196,7 +196,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria:** manual curl/HTTP checks for: happy create; duplicate name; Σ>100; bad kind; PATCH percentage pushing Σ over 100; DELETE blocked and allowed cases; 404s.
 
 #### T06 — Categories UI + navigation + page stubs
-**Status:** ⬜ TODO · **Depends on:** T05 · **Files:** `app/layout.tsx`, `components/Nav.tsx`, `app/categories/page.tsx`, stub pages `app/income|expenses|savings/page.tsx`
+**Status:** ✅ DONE · **Depends on:** T05 · **Files:** `app/layout.tsx`, `components/Nav.tsx`, `app/categories/page.tsx`, stub pages `app/income|expenses|savings/page.tsx`
 - `Nav`: app title "Savings Tracker" + links: Dashboard `/`, Income, Expenses, Savings, Categories.
 - `/categories`: list (name, kind badge, %, color dot, usage counts), create form, inline edit, delete with `window.confirm`, live "Total: X% · Unallocated: Y%" indicator (green at 100%).
 - Empty state: "No categories yet — create your own buckets (e.g., Bills, Needs, Debts, Savings)."
@@ -318,6 +318,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T03 | Full-stack Developer | Wrote the 4 §5 models (String kind/direction, no enums); `prisma migrate dev --name init` created `prisma/dev.db` + `20261016160931_init`; client counts all 4 tables = 0; build green; commit `b287122`. |
 | 2026-10-17 | T04 | Full-stack Developer | `lib/constants.ts` (APP_CURRENCY/APP_LOCALE), `money.ts` (toCents/formatCents), `allocation.ts` (splitIncome §7 largest remainder), `dates.ts` (parseMonth/parseDate/formatDate/monthLabel/currentMonth/shiftMonth). 21 unit tests green (incl. §8 cases + randomized invariant); lint+build green; commit `6c69de5`. |
 | 2026-10-17 | T05 | Full-stack Developer | Categories API GET/POST + PATCH/DELETE on `[id]`; zod validation (§6 error shape), case-insensitive name checks, Σ%>100.01 guard, 404/409/204 paths. 25/25 curl checks PASS; DB wiped clean after; lint+build green (routes build as ƒ Dynamic); commit `a2ddb5c`. |
+| 2026-10-17 | T06 | Full-stack Developer | Nav (active links) + new layout/light theme; `/categories` client page (create form, inline edit, delete w/ confirm, Total/Unallocated indicator, empty state); Income/Expenses/Savings stubs; `lib/api.ts` fetch helper; `components/EmptyState.tsx`. 35/35 SSR checks PASS; lint+build green; commit `15d68db`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -333,6 +334,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T05 · GET `/api/categories` includes additive `expenseCount`/`savingsCount` (Prisma `_count`) and `createdAt` · reason: T06 needs usage counts for the list + delete-blocked preview; additive fields don't change the §6 contract.
 - 2026-10-17 · T05 · Σ% guard implemented in basis points: reject when `sumBp > 10001` (= 100.01%), exactly as §8 T05 says; duplicate-name checks are exact case-insensitive comparisons (`"Bills"`/`"bills"` collide) · reason: SQLite `@unique` is case-sensitive (no `mode:"insensitive"` on SQLite).
 - 2026-10-17 · T05 · Validation errors return the first zod issue as `"<field>: <message>"` in `{ error }` (§6 shape); PATCH requires at least one field · reason: stays human-readable while identifying the offending field.
+- 2026-10-17 · T06 · Removed the template's `prefers-color-scheme` auto-dark flip and standardized the app on a light slate theme (dark mode is out of scope) · reason: keep one consistent look; avoids half-styled rendering on dark OS themes.
 
 ### 13. Open questions (for the human)
 
@@ -400,3 +402,16 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Verification evidence:** 25/25 curl checks PASS against `npm run dev` (recorded live): empty list `[]`; create Bills 201 + Needs 201; duplicate "bills" 409; Debts 45 → Σ105 400 with message; bad kind 400; Fun (SAVINGS) 201; PATCH →60 → 400; PATCH duplicate name → 409; PATCH rename+15 → 200; unknown id 404; empty PATCH 400; DELETE unused 204; DELETE with expense 409 `Cannot delete…`; DELETE unknown 404; invalid JSON 400; GET shows `"expenseCount":1`. Test rows wiped afterward → GET `[]` (fresh-install state, D3). `npm run lint` + `npm run build` exit 0 (routes compiled as `ƒ Dynamic`).
 - **Notes:** additive `expenseCount`/`savingsCount` in GET (used by T06 UI). Exact acceptance curl combos per §8 T05 all included above.
 - **Acceptance criteria (§8 T05):** ✅ happy create · ✅ duplicate name · ✅ Σ>100 · ✅ bad kind · ✅ PATCH pushing Σ over 100 · ✅ DELETE blocked + allowed · ✅ 404s.
+
+### T06 — Categories UI + navigation + page stubs ✅
+- **Commit:** `15d68db T06: categories UI + navigation + page stubs`
+- **Files:**
+  - `components/Nav.tsx` — client nav: "Savings Tracker" title + Dashboard/Income/Expenses/Savings/Categories links with active-route highlighting (`usePathname`).
+  - `app/layout.tsx` — Nav on every page, light slate theme, metadata title "Savings Tracker", max-w container.
+  - `app/globals.css` — removed auto dark-mode flip (light theme only, dark mode out of scope).
+  - `app/categories/page.tsx` — client page: create form (name, kind select, %, color picker), list with color dot + kind badge + % + usage counts, inline edit (Save/Cancel), delete with `window.confirm`, live `Total: X% · Unallocated: Y%` chip (green at ≥100%), inline error display, loading state, and the onboarding empty state ("No categories yet — create your own buckets (e.g., Bills, Needs, Debts, Savings)…").
+  - `app/income|expenses|savings/page.tsx` — "coming soon" stubs (replaced in T08/T10/T12).
+  - `lib/api.ts` — fetch helper that extracts `{ error }` messages; `components/EmptyState.tsx` shared empty state (also used by stubs).
+- **Verification evidence:** dev server; 5/5 pages return 200; nav markup (title + all 5 links) present on all 5 pages (35 checks PASS); SSR HTML of `/categories` contains heading, create form and Total/Unallocated indicator; stubs render; `npm run lint` + `npm run build` exit 0 (pages prerendered ○; API routes ƒ).
+- **Deferred to QA (T16):** click-through of create/edit/delete/Σ>100-error flows in a real browser (the underlying API paths were fully curl-verified in T05; markup rendering verified here via SSR).
+- **Acceptance criteria (§8 T06):** ✅ create/edit/delete wired to T05 API (verified server-side) · ✅ Σ>100 blocked with visible error (formError/editError surface server 400 message) · ✅ server errors surface near the form · ✅ nav present on all pages · ✅ empty DB shows onboarding empty state (rendered after fetch; SSR shows loading state first).

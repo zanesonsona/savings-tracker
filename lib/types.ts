@@ -129,3 +129,22 @@ export function toCategoryRefDTO(category: {
     color: category.color,
   };
 }
+
+/** Map a Prisma Income to the JSON DTO shape. */
+export function toIncomeDTO(income: {
+  id: number;
+  amountCents: number;
+  source: string | null;
+  date: Date;
+  note: string | null;
+  createdAt: Date;
+}): IncomeDTO {
+  return {
+    id: income.id,
+    amountCents: income.amountCents,
+    source: income.source,
+    date: income.date.toISOString(),
+    note: income.note,
+    createdAt: income.createdAt.toISOString(),
+  };
+}

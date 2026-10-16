@@ -2,17 +2,16 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { formatPercentBp } from "@/lib/money";
 import { toCategoryDTO } from "@/lib/types";
-import { categoryUpdateSchema, zodErrorMessage } from "@/lib/validation";
-
-function parseId(raw: string): number | null {
-  const id = Number(raw);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
+import {
+  categoryUpdateSchema,
+  parseIdParam,
+  zodErrorMessage,
+} from "@/lib/validation";
 
 // PATCH /api/categories/[id] → 200 with the updated CategoryDTO.
 export async function PATCH(request: Request, ctx: RouteContext<"/api/categories/[id]">) {
   const { id: rawId } = await ctx.params;
-  const id = parseId(rawId);
+  const id = parseIdParam(rawId);
   if (id === null) {
     return NextResponse.json({ error: "Invalid category id" }, { status: 400 });
   }
@@ -80,7 +79,7 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/categories
 // DELETE /api/categories/[id] → 204; 409 when expenses/savings entries exist (D9).
 export async function DELETE(_request: Request, ctx: RouteContext<"/api/categories/[id]">) {
   const { id: rawId } = await ctx.params;
-  const id = parseId(rawId);
+  const id = parseIdParam(rawId);
   if (id === null) {
     return NextResponse.json({ error: "Invalid category id" }, { status: 400 });
   }
