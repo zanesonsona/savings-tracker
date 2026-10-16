@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-16 · **Plan version:** PM v1 · **Next up:** T01 — Scaffold Next.js app · **Progress:** 0/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T02 — Add Prisma + SQLite + zod + vitest · **Progress:** 1/16 tasks
 
 ### 1. Vision
 
@@ -157,7 +157,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 ---
 
 #### T01 — Scaffold Next.js app
-**Status:** ⬜ TODO · **Depends on:** — · **Files:** repo root
+**Status:** ✅ DONE · **Depends on:** — · **Files:** repo root
 - Run `npx create-next-app@latest . --typescript --tailwind --eslint --app --no-src-dir --import-alias "@/*"` in this folder; accept defaults for any other prompt (e.g., Turbopack).
 - `git init` + initial commit (D12). Ensure `.gitignore` covers `node_modules`, `.next`, `*.db`, `.env*`.
 - **Acceptance criteria:** `npm run dev` serves the default page; `npm run build` and `npm run lint` pass; initial commit exists.
@@ -313,13 +313,36 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | Date | Task | Agent | Summary / notes |
 |------|------|-------|-----------------|
 | 2026-10-16 | PM | Project Manager | Created plan PM v1: vision, decisions D1–D13, data model, API contract, 16-task backlog (T01–T16). Next: T01. |
+| 2026-10-17 | T01 | Full-stack Developer | Scaffolded Next.js 16.4.2 app (App Router, TS, Tailwind v4, ESLint); extended .gitignore (*.db, !.env.example); git init + commit `ed21810`. Verified build/lint/dev (HTTP 200). Details in §"Full-stack Developer". |
 
 ### 12. Agent decision log (provisional)
 
 _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · reason`). PM decisions live in §3._
+
+- 2026-10-17 · T01 · Dev toolchain installed **inside WSL Debian** (Node v24.22.0 LTS via official tarball into `/usr/local`, git 2.47.3 + curl via apt). All project commands run in WSL, not Windows node. · reason: repo lives on the ext4 Linux filesystem; native deps (Prisma engines, Turbopack, SWC) need Linux binaries and Windows/UNC tooling would break them.
+- 2026-10-17 · T01 · Repo-local git identity `Full-stack Developer <dev@todo-app.local>` for task commits (D12). · reason: agent commits need an identity; user's global git config left untouched.
 
 ### 13. Open questions (for the human)
 
 - **Q1 — Currency/display locale:** defaulted to `USD` in `lib/constants.ts` (`APP_CURRENCY`). Tell the PM your preferred currency symbol (e.g., ₱, €) — change is trivial until the Settings page (Later) exists. Until answered, agents proceed with USD.
 - **Q2 — Recurring salary:** MVP = one entry per paycheck, no auto-repeat. Confirm if you want monthly recurrence as a later feature.
 - **Q3 — Editing entries:** MVP = create + delete only. Confirm if quick edit of past income/expenses is needed soon.
+
+---
+
+## Full-stack Developer
+
+> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T01.
+
+### T01 — Scaffold Next.js app ✅
+- **Commit:** `ed21810 T01: scaffold Next.js app`
+- **Scaffold command:** `npx create-next-app@latest . --typescript --tailwind --eslint --app --no-src-dir --import-alias "@/*" --use-npm --yes` (ran in WSL with `Project_state.md` temporarily stashed outside the folder, then restored).
+- **Versions scaffolded:** Next.js 16.4.2 (App Router, Turbopack default, "Cache Components enabled"), React 19.3.0, TypeScript ^5, Tailwind CSS v4 (`@import "tailwindcss"`), ESLint 9 flat config (`npm run lint` = `eslint`).
+- **`.gitignore`:** default template kept + added `*.db`, `*.db-journal`, and `!.env.example` (so the committed env example from T02 is not ignored by `.env*`).
+- **Environment note:** no Node existed in WSL — installed Node v24.22.0 LTS into `/usr/local` (official tarball), git 2.47.3 + curl via apt (as root). All project commands are run in WSL Debian as user `zane`.
+- **Verification evidence (all recorded in this session):**
+  - `npm run build` → exit 0 (compiled successfully; 4/4 static pages generated).
+  - `npm run lint` → exit 0.
+  - `npm run dev` → `GET / 200` in 212ms; default page HTML served.
+  - `git log --oneline` → single initial commit `ed21810`; working tree clean.
+- **Acceptance criteria (§8 T01):** ✅ dev serves default page · ✅ build passes · ✅ lint passes · ✅ initial commit exists.
