@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T15 — Seed script + README + polish · **Progress:** 14/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T16 — QA / end-to-end verification pass · **Progress:** 15/16 tasks
 
 ### 1. Vision
 
@@ -275,7 +275,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria (browser):** numbers reconcile with Income/Expenses/Savings pages for the same month; month navigation to an empty month shows zeros + empty states, no errors.
 
 #### T15 — Seed script + README + polish
-**Status:** ⬜ TODO · **Depends on:** T14 · **Files:** `prisma/seed.ts`, `README.md`
+**Status:** ✅ DONE · **Depends on:** T14 · **Files:** `prisma/seed.ts`, `README.md`
 - `prisma/seed.ts` (**DEV ONLY**, idempotent — wipes tables first): categories Bills 35 / Needs 25 / Debts 20 / Savings 20 (last one kind=SAVINGS), 2 incomes, a few expenses, 1 deposit. The **app itself must still start empty** (D3).
 - README: prerequisites, install, env setup, migrate, (optional) seed, run, test, build; architecture map; scripts table.
 - Polish sweep: loading + disabled states on submit buttons, inline error display, favicon/title, `npm run lint` clean.
@@ -327,6 +327,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T12 | Full-stack Developer | Savings UI: big all-time balance card (red when negative) + month-net line, month prev/next, DEPOSIT/WITHDRAWAL toggle, amount/category/date/note form (SAVINGS-kind only), history list (+green / −red) with delete, empty states. 20/20 script checks (SSR + UI query smoke incl. 1000→200→800) PASS; DB wiped; lint+build green; commit `27b8ed2`. |
 | 2026-10-17 | T13 | Full-stack Developer | Overview API: month payload `{month, incomeTotalCents, unallocatedCents, categories[allocated/actual/remaining/progress], totals{spent,netSaved}, savingsBalanceCents}`; allocations recomputed live via `splitIncome` (D6), savings actual = month net, balance all-time (D7). 53/53 curl checks PASS (Oct/Sep/Dec-2025/Jan-2026 + zero-category payload + 400s); DB wiped; lint+build green; commit `83c9c7b`. |
 | 2026-10-17 | T14 | Full-stack Developer | Dashboard UI: month picker driving `/api/overview`, 4 summary cards (Income/Spent/Net saved/Savings balance), per-category rows (dot+badge, actual of allocated, remaining/over, `ProgressBar` red >100%), onboarding + no-income empty states; boilerplate replaced. 20/20 script checks PASS incl. income/spent/saved/balance/bills reconciliation vs the three page APIs; DB wiped; lint+build green; commit `ea885a3`. |
+| 2026-10-17 | T15 | Full-stack Developer | DEV-ONLY idempotent `prisma/seed.ts` (wipes + 4 categories 35/25/20/20, 2 incomes, 4 expenses, 1 deposit; production guard); full README (setup, optional seed, scripts, architecture, money rules); polish: custom `app/icon.svg` (default favicon removed), `vitest.config.mts` (ESM warning gone), lint clean. 40/40 script checks PASS (fresh-empty → seed → numbers → re-seed idempotency → wipe); lint+build green; commit `2f4add3`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -347,6 +348,8 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T09 · POST `/api/expenses`: **404** for a nonexistent `categoryId`, **400** with `Use Savings entries for savings categories` for an existing SAVINGS-kind category · reason: §8 T09 acceptance says "unknown category 404"; the 400 message is mandated for the kind mismatch. GET merges both optional filters into one Prisma `where` (they combine).
 - 2026-10-17 · T10 · Expense page's default month is **client-only** (`lib/use-current-month.ts`, same `useSyncExternalStore` pattern as `useToday`) and prev/next use `shiftMonth` on UTC months (§7) · reason: a build-time prerendered `currentMonth()` could hydrate mismatched after a month rollover; blank-until-hydrated avoids it. Category filter only offers EXPENSE-kind categories.
 - 2026-10-17 · T11 · GET `/api/savings` with **no `?month=`** defaults to the current UTC month (entries + `monthNetCents`); `balanceCents` is always all-time (D7) · reason: keeps the response shape constant for T12 while remaining curl-friendly. POST wrong-kind message: `Savings entries need a SAVINGS-kind category (create one in Categories first)` (§8 T11 "style message").
+- 2026-10-17 · T15 · Replaced the create-next-app `app/favicon.ico` with a custom **`app/icon.svg`** (slate rounded square + green trend line) and renamed `vitest.config.ts` → **`vitest.config.mts`** · reason: own-brand tab icon (title already "Savings Tracker"); the `.mts` extension clears Vite's ESM-in-CJS configLoader warning without touching behavior.
+- 2026-10-17 · T15 · Seed dates are **relative to the run date** (`currentMonth()` / `shiftMonth(-1)`): income day 01 + 3 expenses + 1 deposit this month, income day 15 + 1 expense last month; seed refuses to run when `NODE_ENV=production` · reason: demo data must land in the month the dashboard opens on; the guard keeps the destructive wipe out of production.
 
 ### 13. Open questions (for the human)
 
@@ -358,7 +361,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 ## Full-stack Developer
 
-> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T14.
+> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T15.
 
 ### T01 — Scaffold Next.js app ✅
 - **Commit:** `ed21810 T01: scaffold Next.js app`
@@ -501,3 +504,15 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Verification evidence:** 20/20 script checks PASS against `npm run dev`: `/` SSR 200 with dashboard heading, month buttons, all four card labels + balance sub-line, nav; boilerplate strings gone. Seeded 35/25/20/20 + income 5000.00 + Bills expense 200.00 + savings deposit 1000.00 in the current month; **reconciliation node check** compares the page's exact query output against the three page APIs: `Σ incomes === incomeTotalCents`, `Σ expenses === totals.spentCents`, `savings.monthNetCents === totals.netSavedCents`, `savings.balanceCents === savingsBalanceCents`, and Bills `175000/20000/155000` — all `ok`. DB wiped → all counts 0. `npm test` 22/22; lint + build exit 0 (`/` ○ static, `/api/overview` ƒ).
 - **Deferred to QA (T16):** browser click-through: month navigation to an empty month (zeros + empty states, no errors), progress-bar red over-budget rendering, mobile stacking (data rendering is client-side; numbers + query verified here).
 - **Acceptance criteria (§8 T14):** ✅ numbers reconcile with Income/Expenses/Savings pages for the same month (automated cross-API check) · ✅ month navigation to an empty month shows zeros + empty states, no errors (API returns valid zeros — verified in T13; UI renders them from the same payload; visual pass deferred to QA).
+
+### T15 — Seed script + README + polish ✅
+- **Commit:** `2f4add3 T15: seed script + README + polish`
+- **Files:**
+  - `prisma/seed.ts` — **DEV ONLY** (aborts when `NODE_ENV=production`), idempotent (wipes `expense → savingsEntry → income → category` first): categories Bills 35 / Needs 25 / Debts 20 (EXPENSE) + Savings 20 (SAVINGS) with colors; 2 incomes (5000.00 salary on the 1st of the current month, 1200.00 freelance on the 15th of the previous month); 4 expenses (200.00 Bills / 80.00 Needs / 150.00 Debts this month + 60.00 Needs last month); 1 deposit (1000.00 Savings, day 2). Dates relative to the run date (`currentMonth()`/`shiftMonth(-1)`); logs counts.
+  - `README.md` — replaced the create-next-app boilerplate: overview + features, tech-stack table, prerequisites, setup steps (install → `.env` → `db:migrate` → `dev`), "starts empty" note (D3), optional DEV-only seed section, scripts table (`dev`/`build`/`start`/`lint`/`test`/`test:watch`/`db:migrate`/`db:seed`/`db:studio`), architecture map, money/data rules summary.
+  - `app/icon.svg` (new) + `app/favicon.ico` (removed) — custom tab icon (slate rounded square, green trend line); `/icon.svg` serves 200 and builds as ○.
+  - `vitest.config.ts` → `vitest.config.mts` — clears Vite's ESM/configLoader warning.
+  - Polish sweep verified in earlier tasks: submit buttons have disabled + "Saving…" states (categories/income/expenses/savings), inline errors near forms, title "Savings Tracker" (layout), `npm run lint` clean.
+- **Verification evidence:** 40/40 script checks PASS against `npm run dev`: fresh (wiped) DB → `/api/categories` = `[]` and `/` 200 with `<title>Savings Tracker</title>` (app starts empty, D3); `npm run db:seed` exit 0 with summary log → categories exactly `Bills/35/EXPENSE/#ef4444`, `Needs/25/EXPENSE/#3b82f6`, `Debts/20/EXPENSE/#f59e0b`, `Savings/20/SAVINGS/#22c55e`; 1 current-month income, 3 current-month expenses, 1 savings entry with balance 1000.00; dashboard payload matches the demo (Bills 175000/20000/155000, Needs remaining 117000, Debts 85000, Savings remaining 0 & progress 1, spent 43000, net saved 100000, balance 100000); **re-running the seed leaves counts identical (4/2/4/1 → idempotent)**; wipe restores `[]`. `npm test` exit 0, 3 files/22 tests pass, and the `configLoader` warning is **absent** (verified). lint + build exit 0 (`/icon.svg` ○ static).
+- **Acceptance criteria (§8 T15):** ✅ fresh setup following the README renders the onboarding empty state (empty DB + API `[]` + `Loading…` SSR verified here; the rendered onboarding card itself is the QA browser pass) · ✅ `npm run db:seed` produces demo data (values + idempotency verified) · ✅ lint + build green.
+- **Handoff note for QA (T16):** the DB is left **empty** (post-wipe); `npm run db:seed` is available for a quick demo dataset. Remaining unverified-here items are all browser-visual (client-rendered lists/chips/bars, modals, navigation) — see the per-task "Deferred to QA" notes above.
