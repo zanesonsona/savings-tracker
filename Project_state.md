@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T11 — Savings API · **Progress:** 10/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T12 — Savings UI · **Progress:** 11/16 tasks
 
 ### 1. Vision
 
@@ -233,7 +233,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria (browser):** add/list/delete works; filters combine; totals change accordingly.
 
 #### T11 — Savings API
-**Status:** ⬜ TODO · **Depends on:** T05 · **Files:** `app/api/savings/route.ts`, `app/api/savings/[id]/route.ts`
+**Status:** ✅ DONE · **Depends on:** T05 · **Files:** `app/api/savings/route.ts`, `app/api/savings/[id]/route.ts`
 - GET `?month=` → `{ entries: SavingsEntry[] (with category), balanceCents /* all-time net */, monthNetCents }`.
 - POST → `{ amountCents: int > 0, direction: "DEPOSIT"|"WITHDRAWAL", date, categoryId, note? }`; category must be `kind = "SAVINGS"` else 400 `Create a category with kind = Savings first` style message. 201.
 - DELETE → 204 / 404. Negative balance allowed (D7/§7).
@@ -323,6 +323,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T08 | Full-stack Developer | Income UI: amount (`toCents`) / source / date / note form; month-grouped list newest-first with split chips (5000.00 @ 35/25/20/20 → 1750/1250/1000/1000) + Unallocated chip; delete w/ confirm; loading + empty states. New `lib/use-today.ts` hook (`useSyncExternalStore` — satisfies Next 16 `react-hooks/set-state-in-effect`). 19/19 script checks + 22/22 unit tests PASS; DB wiped; lint+build green; commit `8d97367`. |
 | 2026-10-17 | T09 | Full-stack Developer | Expenses API: GET (newest first, category embedded, `?month=`+`?categoryId=` combinable filters), POST (zod cents/date/categoryId/note; savings-kind → 400 `Use Savings entries for savings categories`; unknown category → 404), DELETE 204/404. `expenseCreateSchema` + `toExpenseDTO` added. 39/39 curl checks PASS; DB wiped; lint+build green; commit `927714d`. |
 | 2026-10-17 | T10 | Full-stack Developer | Expense UI: month prev/next (client-only default via new `lib/use-current-month.ts`), category filter, day-grouped list (badge + note + amount + delete w/ confirm), live count + total line, amount/category/date/note form (EXPENSE-kind only), empty states (no categories / no match / empty month). 17/17 script checks (SSR + UI query smoke) PASS; DB wiped; lint+build green; commit `cc8ff36`. |
+| 2026-10-17 | T11 | Full-stack Developer | Savings API: GET (month entries newest-first w/ category, all-time `balanceCents`, `monthNetCents`; `?month=` defaults to current UTC month) / POST (zod cents/direction/date/categoryId/note; non-SAVINGS kind → 400, unknown → 404) / DELETE. Negative balances allowed (D7, verified −3700). 41/41 curl checks PASS; DB wiped; lint+build green; commit `a41677f`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -342,6 +343,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T08 · Date defaults ("today") come from a new `lib/use-today.ts` hook built on `useSyncExternalStore` (`""` server snapshot → local `YYYY-MM-DD` after hydration) instead of a mount `useEffect` + setState · reason: Next 16's `react-hooks/set-state-in-effect` lint rule rejects the effect pattern; the store hook is the React-blessed way to render a client-only value with no hydration mismatch, and T10/T12 date pickers will reuse it.
 - 2026-10-17 · T09 · POST `/api/expenses`: **404** for a nonexistent `categoryId`, **400** with `Use Savings entries for savings categories` for an existing SAVINGS-kind category · reason: §8 T09 acceptance says "unknown category 404"; the 400 message is mandated for the kind mismatch. GET merges both optional filters into one Prisma `where` (they combine).
 - 2026-10-17 · T10 · Expense page's default month is **client-only** (`lib/use-current-month.ts`, same `useSyncExternalStore` pattern as `useToday`) and prev/next use `shiftMonth` on UTC months (§7) · reason: a build-time prerendered `currentMonth()` could hydrate mismatched after a month rollover; blank-until-hydrated avoids it. Category filter only offers EXPENSE-kind categories.
+- 2026-10-17 · T11 · GET `/api/savings` with **no `?month=`** defaults to the current UTC month (entries + `monthNetCents`); `balanceCents` is always all-time (D7) · reason: keeps the response shape constant for T12 while remaining curl-friendly. POST wrong-kind message: `Savings entries need a SAVINGS-kind category (create one in Categories first)` (§8 T11 "style message").
 
 ### 13. Open questions (for the human)
 
@@ -353,7 +355,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 ## Full-stack Developer
 
-> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T10.
+> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T11.
 
 ### T01 — Scaffold Next.js app ✅
 - **Commit:** `ed21810 T01: scaffold Next.js app`
@@ -461,3 +463,14 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Verification evidence:** 17/17 script checks PASS against `npm run dev`: `/expenses` 200 with all static UI strings in SSR HTML ("Add expense", amount/note placeholders, "Previous month"/"Next month", "All categories", subheading) and the old "coming soon" stub text gone; seeded a Bills category + one expense dated in the current UTC month; the **exact queries the page issues** (`?month=<current>`, `?month=<current>&categoryId=<Bills>`) each return the 1 seeded row with embedded category. DB wiped → all counts 0. `npm test` 22/22; lint + build exit 0 (`/expenses` ○ static).
 - **Deferred to QA (T16):** browser click-through of add → list/total updates, prev/next month navigation, category filter combining, delete (data rendering is client-side after fetch; the query layer + API paths are covered here and in T09).
 - **Acceptance criteria (§8 T10):** ✅ add/list/delete wired (form + handlers implemented; API fully curl-verified in T09) · ✅ filters combine (same query the page builds is curl-verified: month+categoryId) · ✅ totals change accordingly (total line recomputed from the filtered response on every reload; visual check deferred to QA).
+
+### T11 — Savings API ✅
+- **Commit:** `a41677f T11: savings API`
+- **Files:**
+  - `app/api/savings/route.ts` — GET (`?month=` optional, defaults to the current UTC month; returns `{ entries, balanceCents, monthNetCents }`; entries month-filtered, newest first, category embedded; malformed month → 400) / POST (zod: `amountCents` int > 0, `direction` DEPOSIT|WITHDRAWAL, `date`, `categoryId`, `note ≤ 200`; **non-SAVINGS kind → 400 `Savings entries need a SAVINGS-kind category (create one in Categories first)`**; unknown category → 404; date → UTC midnight; 201). Net math via `groupBy(direction)` — deposits − withdrawals, no negative-balance guard (D7).
+  - `app/api/savings/[id]/route.ts` — DELETE → 204 / 404 (always allowed, D9).
+  - `lib/validation.ts` — adds `savingsCreateSchema` (`savingsDirectionSchema` already existed).
+  - `lib/types.ts` — adds `toSavingsEntryDTO` (`SavingsEntryDTO`/`SavingsListResponse` shapes already existed).
+- **Verification evidence:** 41/41 curl checks PASS against `npm run dev`: deposits 1000.00 (Oct) + 500.00 (Sep, second savings category) and withdrawal 200.00 (Oct) → GET `?month=2026-10` = 2 entries newest-first, `monthNetCents` 80000, `balanceCents` 130000 (all-time across months/categories); `?month=2026-09` → 1 entry, net 50000, balance 130000; `?month=2026-11` → 0 entries/net 0/balance 130000; no-`month` → current month; `2026-13` → 400; Bills (EXPENSE) category → 400 with message; categoryId 999999 → 404; 400s for amount 0 / direction `TRANSFER` / `2026-02-30`; big withdrawal → **`"balanceCents":-370000` then `-420000` month net (negative allowed, D7)**; deletes → 204/404/400 and balance follows (1300 → 800 after deleting the Sep deposit). Wiped clean (`category=0 …`). `npm test` 22/22; lint + build exit 0 (`/api/savings*` ƒ Dynamic).
+- **Acceptance criteria (§8 T11):** ✅ deposit then withdrawal → balance math correct (130000/80000 and negative cases) · ✅ wrong-kind category rejected (exact message) · ✅ month filter works (incl. empty month + year-safe ranges).
+- **Notes:** month net for `?month=` omitted defaults to the current UTC month — recorded in the decision log. Negative balance is never blocked (D7).
