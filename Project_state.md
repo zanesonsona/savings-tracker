@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T07 — Income API · **Progress:** 6/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T08 — Income UI with split preview · **Progress:** 7/16 tasks
 
 ### 1. Vision
 
@@ -205,7 +205,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria (browser):** create/edit/delete works; Σ>100 blocked with visible error; server errors surface near the form; nav present on all pages; empty DB shows the onboarding empty state.
 
 #### T07 — Income API
-**Status:** ⬜ TODO · **Depends on:** T03, T04 · **Files:** `app/api/incomes/route.ts`, `app/api/incomes/[id]/route.ts`
+**Status:** ✅ DONE · **Depends on:** T03, T04 · **Files:** `app/api/incomes/route.ts`, `app/api/incomes/[id]/route.ts`
 - GET → `Income[]`, newest first; optional `?month=YYYY-MM` filter (§7 month rule; 400 on malformed month).
 - POST → `{ amountCents: int > 0, source?: string ≤ 60, date: "YYYY-MM-DD", note?: string ≤ 200 }`; store date at UTC midnight; 201.
 - DELETE → 204 / 404.
@@ -319,6 +319,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T04 | Full-stack Developer | `lib/constants.ts` (APP_CURRENCY/APP_LOCALE), `money.ts` (toCents/formatCents), `allocation.ts` (splitIncome §7 largest remainder), `dates.ts` (parseMonth/parseDate/formatDate/monthLabel/currentMonth/shiftMonth). 21 unit tests green (incl. §8 cases + randomized invariant); lint+build green; commit `6c69de5`. |
 | 2026-10-17 | T05 | Full-stack Developer | Categories API GET/POST + PATCH/DELETE on `[id]`; zod validation (§6 error shape), case-insensitive name checks, Σ%>100.01 guard, 404/409/204 paths. 25/25 curl checks PASS; DB wiped clean after; lint+build green (routes build as ƒ Dynamic); commit `a2ddb5c`. |
 | 2026-10-17 | T06 | Full-stack Developer | Nav (active links) + new layout/light theme; `/categories` client page (create form, inline edit, delete w/ confirm, Total/Unallocated indicator, empty state); Income/Expenses/Savings stubs; `lib/api.ts` fetch helper; `components/EmptyState.tsx`. 35/35 SSR checks PASS; lint+build green; commit `15d68db`. |
+| 2026-10-17 | T07 | Full-stack Developer | Incomes API: GET (newest first, `?month=` UTC filter, 400 on malformed), POST (int cents > 0, date → UTC midnight, source/note limits), DELETE. Shared validation fragments + `parseIdParam`; categories API refactored onto it. 30/30 curl checks PASS incl. year boundary + UTC-midnight storage; commit `25b7ebc`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -415,3 +416,13 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Verification evidence:** dev server; 5/5 pages return 200; nav markup (title + all 5 links) present on all 5 pages (35 checks PASS); SSR HTML of `/categories` contains heading, create form and Total/Unallocated indicator; stubs render; `npm run lint` + `npm run build` exit 0 (pages prerendered ○; API routes ƒ).
 - **Deferred to QA (T16):** click-through of create/edit/delete/Σ>100-error flows in a real browser (the underlying API paths were fully curl-verified in T05; markup rendering verified here via SSR).
 - **Acceptance criteria (§8 T06):** ✅ create/edit/delete wired to T05 API (verified server-side) · ✅ Σ>100 blocked with visible error (formError/editError surface server 400 message) · ✅ server errors surface near the form · ✅ nav present on all pages · ✅ empty DB shows onboarding empty state (rendered after fetch; SSR shows loading state first).
+
+### T07 — Income API ✅
+- **Commit:** `25b7ebc T07: income API`
+- **Files:**
+  - `app/api/incomes/route.ts` — GET (newest first: `date desc, id desc`; optional `?month=YYYY-MM` → `[UTC 1st, next month)` per §7; malformed month → 400) / POST (zod: `amountCents` int > 0, `date` YYYY-MM-DD + real-calendar validation, `source ≤ 60`, `note ≤ 200`; stores date at UTC midnight; empty strings → `null`; 201).
+  - `app/api/incomes/[id]/route.ts` — DELETE → 204 / 404 (entry deletes always allowed, D9).
+  - `lib/validation.ts` — shared fragments now include `moneyAmountSchema`, `monthSchema`, `dateSchema` (regex + `parseDate` round-trip), `sourceSchema`, `noteSchema`, `incomeCreateSchema`, `parseIdParam`, `emptyToNull`.
+  - `lib/types.ts` — `toIncomeDTO`; `app/api/categories/[id]/route.ts` refactored to shared `parseIdParam`.
+- **Verification evidence:** 30/30 curl checks PASS: happy 201 (stores cents); 0/negative/non-integer cents → 400; `2026-02-30` + malformed dates → 400; 61-char source → 400; GET all → 3 entries newest-first; `?month=2026-10` / `2026-09` / `2025-12` filter correctly (year-boundary case); `2026-01` → `[]`; `2026-13` & `abc` → 400; DB check shows stored date `2026-10-01T00:00:00.000Z` (UTC midnight); DELETE 204 → 404; invalid id 400. Wiped clean after. lint + build exit 0.
+- **Acceptance criteria (§8 T07):** ✅ curl checks incl. month filter across year boundary · ✅ invalid amount/date → 400.
