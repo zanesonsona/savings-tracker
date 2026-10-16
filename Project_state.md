@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T09 — Expense API · **Progress:** 8/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T10 — Expense UI · **Progress:** 9/16 tasks
 
 ### 1. Vision
 
@@ -219,7 +219,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria (browser):** entering 5000.00 with categories 35/25/20/20 shows 1750/1250/1000/1000; totals sum exactly; delete works; month grouping correct.
 
 #### T09 — Expense API
-**Status:** ⬜ TODO · **Depends on:** T05 · **Files:** `app/api/expenses/route.ts`, `app/api/expenses/[id]/route.ts`
+**Status:** ✅ DONE · **Depends on:** T05 · **Files:** `app/api/expenses/route.ts`, `app/api/expenses/[id]/route.ts`
 - GET → `Expense[]` with `category { id, name, kind, color }` included; filters `?month=` and `?categoryId=`.
 - POST → `{ amountCents: int > 0, date, categoryId, note? }`; category must exist and be `kind = "EXPENSE"` else 400 `Use Savings entries for savings categories`. 201.
 - DELETE → 204 / 404.
@@ -321,6 +321,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T06 | Full-stack Developer | Nav (active links) + new layout/light theme; `/categories` client page (create form, inline edit, delete w/ confirm, Total/Unallocated indicator, empty state); Income/Expenses/Savings stubs; `lib/api.ts` fetch helper; `components/EmptyState.tsx`. 35/35 SSR checks PASS; lint+build green; commit `15d68db`. |
 | 2026-10-17 | T07 | Full-stack Developer | Incomes API: GET (newest first, `?month=` UTC filter, 400 on malformed), POST (int cents > 0, date → UTC midnight, source/note limits), DELETE. Shared validation fragments + `parseIdParam`; categories API refactored onto it. 30/30 curl checks PASS incl. year boundary + UTC-midnight storage; commit `25b7ebc`. |
 | 2026-10-17 | T08 | Full-stack Developer | Income UI: amount (`toCents`) / source / date / note form; month-grouped list newest-first with split chips (5000.00 @ 35/25/20/20 → 1750/1250/1000/1000) + Unallocated chip; delete w/ confirm; loading + empty states. New `lib/use-today.ts` hook (`useSyncExternalStore` — satisfies Next 16 `react-hooks/set-state-in-effect`). 19/19 script checks + 22/22 unit tests PASS; DB wiped; lint+build green; commit `8d97367`. |
+| 2026-10-17 | T09 | Full-stack Developer | Expenses API: GET (newest first, category embedded, `?month=`+`?categoryId=` combinable filters), POST (zod cents/date/categoryId/note; savings-kind → 400 `Use Savings entries for savings categories`; unknown category → 404), DELETE 204/404. `expenseCreateSchema` + `toExpenseDTO` added. 39/39 curl checks PASS; DB wiped; lint+build green; commit `927714d`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -338,6 +339,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T05 · Validation errors return the first zod issue as `"<field>: <message>"` in `{ error }` (§6 shape); PATCH requires at least one field · reason: stays human-readable while identifying the offending field.
 - 2026-10-17 · T06 · Removed the template's `prefers-color-scheme` auto-dark flip and standardized the app on a light slate theme (dark mode is out of scope) · reason: keep one consistent look; avoids half-styled rendering on dark OS themes.
 - 2026-10-17 · T08 · Date defaults ("today") come from a new `lib/use-today.ts` hook built on `useSyncExternalStore` (`""` server snapshot → local `YYYY-MM-DD` after hydration) instead of a mount `useEffect` + setState · reason: Next 16's `react-hooks/set-state-in-effect` lint rule rejects the effect pattern; the store hook is the React-blessed way to render a client-only value with no hydration mismatch, and T10/T12 date pickers will reuse it.
+- 2026-10-17 · T09 · POST `/api/expenses`: **404** for a nonexistent `categoryId`, **400** with `Use Savings entries for savings categories` for an existing SAVINGS-kind category · reason: §8 T09 acceptance says "unknown category 404"; the 400 message is mandated for the kind mismatch. GET merges both optional filters into one Prisma `where` (they combine).
 
 ### 13. Open questions (for the human)
 
@@ -349,7 +351,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 ## Full-stack Developer
 
-> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T08.
+> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T09.
 
 ### T01 — Scaffold Next.js app ✅
 - **Commit:** `ed21810 T01: scaffold Next.js app`
@@ -438,3 +440,13 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Verification evidence:** 19/19 script checks PASS against `npm run dev`: 4 categories (Bills 35 / Needs 25 / Debts 20 / Savings 20) + 5000.00 income seeded via API (all 201); `splitIncome` executed over the **real DB rows** (no hardcoded ids) → Bills 175000 · Needs 125000 · Debts 100000 · Savings 100000, `unallocatedCents: 0`; `/income` SSR 200 and contains "Add income", the split subheading, all three field placeholders and the nav; DB wiped → `category=0 income=0 expense=0 savings=0` (D3). `npm test` → 22/22 (3 files); `npm run lint` + `npm run build` exit 0 (pages ○ static, API routes ƒ Dynamic).
 - **Deferred to QA (T16):** browser click-through of add → chips visible / delete flow (chips render after the client-side fetch, so they are not visible in SSR HTML; the underlying `splitIncome` math + API paths are covered here).
 - **Acceptance criteria (§8 T08):** ✅ 5000.00 @ 35/25/20/20 → 1750/1250/1000/1000 (acceptance unit test + live DB computation) · ✅ totals sum exactly (unallocated 0) · ✅ delete per row wired (API curl-verified in T07; button + confirm + reload implemented) · ✅ month grouping newest-first (API ordering + grouping logic verified).
+
+### T09 — Expense API ✅
+- **Commit:** `927714d T09: expense API`
+- **Files:**
+  - `app/api/expenses/route.ts` — GET (newest first: `date desc, id desc`; category embedded via `include`; optional `?month=YYYY-MM` filter using the same UTC month rule as incomes; optional `?categoryId=` filter — they combine in one `where`; malformed month/categoryId → 400) / POST (zod: `amountCents` int > 0, `date` YYYY-MM-DD, `categoryId` positive int, `note ≤ 200`; **unknown category → 404**; **SAVINGS-kind category → 400 `Use Savings entries for savings categories`**; stores date at UTC midnight; 201).
+  - `app/api/expenses/[id]/route.ts` — DELETE → 204 / 404 (entry deletes always allowed, D9).
+  - `lib/validation.ts` — adds `categoryIdSchema` + `expenseCreateSchema`.
+  - `lib/types.ts` — adds `toExpenseDTO` (maps `Expense` + included category via `toCategoryRefDTO`).
+- **Verification evidence:** 39/39 curl checks PASS against `npm run dev`: happy 201s (Bills 2026-10-05 w/ note, Needs 2026-10-06 no note → `null`, Bills 2026-09-15); DTO carries `"date":"2026-10-05T00:00:00.000Z"` (UTC midnight) + embedded `"category":{…"name":"Bills","kind":"EXPENSE","color":"#ef4444"}`; SAVINGS category → 400 with exact message; categoryId 999999 → 404 `Category not found`; 400s for amount 0 / fractional cents / 2026-02-30 / missing categoryId / string categoryId / 201-char note; GET all → 3 rows newest-first; `?month=2026-10` → 2, `2026-09` → 1, `2026-11` → 0, `2026-13`/`2026-1` → 400; `?categoryId=<Bills>` → 2; **combined `month+categoryId` → 1**; unknown categoryId filter → `[]`; `categoryId=abc` → 400; DELETE 204 → repeat 404 → bad id 400 → count drops to 2. Wiped clean after (`category=0 … savings=0`). `npm test` 22/22; lint + build exit 0 (`/api/expenses*` build as ƒ Dynamic).
+- **Acceptance criteria (§8 T09):** ✅ happy path · ✅ savings-kind category rejected (exact message) · ✅ unknown category 404 · ✅ month + category filters combine.
