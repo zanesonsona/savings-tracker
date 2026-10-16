@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T12 — Savings UI · **Progress:** 11/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T13 — Overview (dashboard) API · **Progress:** 12/16 tasks
 
 ### 1. Vision
 
@@ -240,7 +240,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria:** curl checks: deposit then withdrawal → balance math correct; wrong-kind category rejected; month filter works.
 
 #### T12 — Savings UI
-**Status:** ⬜ TODO · **Depends on:** T11, T06 · **Files:** `app/savings/page.tsx`, `components/*`
+**Status:** ✅ DONE · **Depends on:** T11, T06 · **Files:** `app/savings/page.tsx`, `components/*`
 - Big balance card (all-time, red when negative), month net line, month filter, history list (+green deposits / −red withdrawals) with delete.
 - Form with DEPOSIT/WITHDRAWAL toggle, amount, savings-category select, date, note.
 - Empty states: no SAVINGS-kind categories → link to `/categories` with explanation; no entries → hint.
@@ -324,6 +324,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T09 | Full-stack Developer | Expenses API: GET (newest first, category embedded, `?month=`+`?categoryId=` combinable filters), POST (zod cents/date/categoryId/note; savings-kind → 400 `Use Savings entries for savings categories`; unknown category → 404), DELETE 204/404. `expenseCreateSchema` + `toExpenseDTO` added. 39/39 curl checks PASS; DB wiped; lint+build green; commit `927714d`. |
 | 2026-10-17 | T10 | Full-stack Developer | Expense UI: month prev/next (client-only default via new `lib/use-current-month.ts`), category filter, day-grouped list (badge + note + amount + delete w/ confirm), live count + total line, amount/category/date/note form (EXPENSE-kind only), empty states (no categories / no match / empty month). 17/17 script checks (SSR + UI query smoke) PASS; DB wiped; lint+build green; commit `cc8ff36`. |
 | 2026-10-17 | T11 | Full-stack Developer | Savings API: GET (month entries newest-first w/ category, all-time `balanceCents`, `monthNetCents`; `?month=` defaults to current UTC month) / POST (zod cents/direction/date/categoryId/note; non-SAVINGS kind → 400, unknown → 404) / DELETE. Negative balances allowed (D7, verified −3700). 41/41 curl checks PASS; DB wiped; lint+build green; commit `a41677f`. |
+| 2026-10-17 | T12 | Full-stack Developer | Savings UI: big all-time balance card (red when negative) + month-net line, month prev/next, DEPOSIT/WITHDRAWAL toggle, amount/category/date/note form (SAVINGS-kind only), history list (+green / −red) with delete, empty states. 20/20 script checks (SSR + UI query smoke incl. 1000→200→800) PASS; DB wiped; lint+build green; commit `27b8ed2`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -355,7 +356,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 ## Full-stack Developer
 
-> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T11.
+> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T12.
 
 ### T01 — Scaffold Next.js app ✅
 - **Commit:** `ed21810 T01: scaffold Next.js app`
@@ -474,3 +475,11 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Verification evidence:** 41/41 curl checks PASS against `npm run dev`: deposits 1000.00 (Oct) + 500.00 (Sep, second savings category) and withdrawal 200.00 (Oct) → GET `?month=2026-10` = 2 entries newest-first, `monthNetCents` 80000, `balanceCents` 130000 (all-time across months/categories); `?month=2026-09` → 1 entry, net 50000, balance 130000; `?month=2026-11` → 0 entries/net 0/balance 130000; no-`month` → current month; `2026-13` → 400; Bills (EXPENSE) category → 400 with message; categoryId 999999 → 404; 400s for amount 0 / direction `TRANSFER` / `2026-02-30`; big withdrawal → **`"balanceCents":-370000` then `-420000` month net (negative allowed, D7)**; deletes → 204/404/400 and balance follows (1300 → 800 after deleting the Sep deposit). Wiped clean (`category=0 …`). `npm test` 22/22; lint + build exit 0 (`/api/savings*` ƒ Dynamic).
 - **Acceptance criteria (§8 T11):** ✅ deposit then withdrawal → balance math correct (130000/80000 and negative cases) · ✅ wrong-kind category rejected (exact message) · ✅ month filter works (incl. empty month + year-safe ranges).
 - **Notes:** month net for `?month=` omitted defaults to the current UTC month — recorded in the decision log. Negative balance is never blocked (D7).
+
+### T12 — Savings UI ✅
+- **Commit:** `27b8ed2 T12: savings UI with balance card`
+- **Files:**
+  - `app/savings/page.tsx` — replaces the T06 stub: big **all-time balance card** (red when negative) + "Net in {month}" line (green/red/neutral by sign); month filter (`← Prev` / label / `Next →`); DEPOSIT/WITHDRAWAL segmented toggle (`aria-pressed`); add-entry form (amount `toCents`, SAVINGS-kind category select, date defaulting to local today, optional note; submit disabled until a savings category exists); history list newest-first with date, category color-dot badge, note, signed amount (`+`/`-`, green/red) and delete w/ `window.confirm`; empty states (no SAVINGS categories → `/categories` with explanation; empty month → hint); loading/error states. Uses the T11 response verbatim (`SavingsListResponse`).
+- **Verification evidence:** 20/20 script checks PASS against `npm run dev`: `/savings` SSR 200 with all static UI strings (balance card label, "Net in", form heading, Deposit/Withdrawal toggles, amount/note placeholders, month buttons, subheading) and stub text gone; seeded a Savings category + deposit 1000.00 + withdrawal 200.00 in the current month; the exact page query `GET /api/savings?month=<current>` returns **balance 80000 (1000 − 200), monthNet 80000**, 2 entries with both directions — matching the §8 T12 acceptance numbers. DB wiped → all counts 0. `npm test` 22/22; lint + build exit 0 (`/savings` ○ static).
+- **Deferred to QA (T16):** browser click-through of the deposit/withdraw toggle flow, negative-balance red styling, delete (data rendering is client-side; the query + math are covered here and in T11).
+- **Acceptance criteria (§8 T12):** ✅ deposit 1000 then withdraw 200 → balance 800 (curl-proven through the page's exact query) · ✅ list updates on reload after add/delete (implemented; visual check QA) · ✅ delete wired (API 204/404 verified in T11; confirm + reload implemented).
