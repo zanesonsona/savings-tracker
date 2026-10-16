@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T03 — Prisma schema + initial migration · **Progress:** 2/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T04 — Money, allocation & date utilities (with unit tests) · **Progress:** 3/16 tasks
 
 ### 1. Vision
 
@@ -172,7 +172,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria:** `npx prisma -v` works; `npm test` exits 0; `npm run build` still passes.
 
 #### T03 — Prisma schema + initial migration
-**Status:** ⬜ TODO · **Depends on:** T02 · **Files:** `prisma/schema.prisma`
+**Status:** ✅ DONE · **Depends on:** T02 · **Files:** `prisma/schema.prisma`
 - Add the four models exactly as in §5 (remember: `kind`/`direction` are `String`, NOT Prisma enums — SQLite limitation).
 - Run `npx prisma migrate dev --name init`.
 - **Acceptance criteria:** migration folder created; `npm run db:studio` lists 4 empty tables; `npm run build` passes.
@@ -315,6 +315,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-16 | PM | Project Manager | Created plan PM v1: vision, decisions D1–D13, data model, API contract, 16-task backlog (T01–T16). Next: T01. |
 | 2026-10-17 | T01 | Full-stack Developer | Scaffolded Next.js 16.4.2 app (App Router, TS, Tailwind v4, ESLint); extended .gitignore (*.db, !.env.example); git init + commit `ed21810`. Verified build/lint/dev (HTTP 200). Details in §"Full-stack Developer". |
 | 2026-10-17 | T02 | Full-stack Developer | Added Prisma 6.19.3 + SQLite + zod 4 + vitest 5 + tsx; `lib/prisma.ts` singleton; scripts (test/db:*); `.env.example`. `npx prisma -v`, `npm test`, lint, build all green; commit `928b0c2`. |
+| 2026-10-17 | T03 | Full-stack Developer | Wrote the 4 §5 models (String kind/direction, no enums); `prisma migrate dev --name init` created `prisma/dev.db` + `20261016160931_init`; client counts all 4 tables = 0; build green; commit `b287122`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -364,3 +365,13 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
   - `npm run lint` → exit 0 · `npm run build` → exit 0 (build shows "Environments: .env").
 - **Known cosmetic warning:** vitest prints a Vite "configLoader" warning about ESM syntax in `vitest.config.ts` (CJS context). Harmless; may be eliminated in T15 polish (e.g. `vitest.config.mts`) if still noisy.
 - **Acceptance criteria (§8 T02):** ✅ `npx prisma -v` works · ✅ `npm test` exits 0 · ✅ `npm run build` still passes.
+
+### T03 — Prisma schema + initial migration ✅
+- **Commit:** `b287122 T03: prisma schema + initial migration`
+- **Files:** `prisma/schema.prisma` (4 models copied exactly from §5: `Category`, `Income`, `Expense`, `SavingsEntry`; `kind`/`direction` are `String` per §4 SQLite note; indexes on `date` / `categoryId` as specified); migration at `prisma/migrations/20261016160931_init/migration.sql` + `migration_lock.toml`.
+- **DB location:** `prisma/dev.db` (gitignored via `*.db`); created and migrated successfully.
+- **Verification evidence:**
+  - `npx prisma migrate dev --name init` → exit 0 ("Your database is now in sync with your schema", client regenerated).
+  - Node script with `--env-file=.env` counting rows via Prisma Client → `{ categories: 0, incomes: 0, expenses: 0, savings: 0 }` (proves all 4 tables exist and are empty). `npm run db:studio` itself is interactive; QA can confirm the 4 tables in the Studio UI.
+  - `npm run build` → exit 0.
+- **Acceptance criteria (§8 T03):** ✅ migration folder created · ✅ 4 empty tables verified (via client counts) · ✅ `npm run build` passes.
