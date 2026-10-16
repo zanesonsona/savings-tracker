@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T04 — Money, allocation & date utilities (with unit tests) · **Progress:** 3/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T05 — Categories API · **Progress:** 4/16 tasks
 
 ### 1. Vision
 
@@ -178,7 +178,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria:** migration folder created; `npm run db:studio` lists 4 empty tables; `npm run build` passes.
 
 #### T04 — Money, allocation & date utilities (with unit tests)
-**Status:** ⬜ TODO · **Depends on:** T02 · **Files:** `lib/constants.ts`, `lib/money.ts`, `lib/allocation.ts`, `lib/dates.ts` + colocated `*.test.ts`
+**Status:** ✅ DONE · **Depends on:** T02 · **Files:** `lib/constants.ts`, `lib/money.ts`, `lib/allocation.ts`, `lib/dates.ts` + colocated `*.test.ts`
 - `lib/constants.ts`: `APP_CURRENCY = "USD"` (single place to change — see Q1).
 - `lib/money.ts`: `toCents(input: string | number): number` (rounds to nearest cent, rejects NaN/negatives), `formatCents(cents: number): string` via `Intl.NumberFormat` with `APP_CURRENCY`.
 - `lib/allocation.ts`: `splitIncome(amountCents, categories: { id, percentage }[])` implementing §7 exactly. Return `{ allocations: { categoryId, amountCents }[], unallocatedCents }`.
@@ -316,6 +316,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T01 | Full-stack Developer | Scaffolded Next.js 16.4.2 app (App Router, TS, Tailwind v4, ESLint); extended .gitignore (*.db, !.env.example); git init + commit `ed21810`. Verified build/lint/dev (HTTP 200). Details in §"Full-stack Developer". |
 | 2026-10-17 | T02 | Full-stack Developer | Added Prisma 6.19.3 + SQLite + zod 4 + vitest 5 + tsx; `lib/prisma.ts` singleton; scripts (test/db:*); `.env.example`. `npx prisma -v`, `npm test`, lint, build all green; commit `928b0c2`. |
 | 2026-10-17 | T03 | Full-stack Developer | Wrote the 4 §5 models (String kind/direction, no enums); `prisma migrate dev --name init` created `prisma/dev.db` + `20261016160931_init`; client counts all 4 tables = 0; build green; commit `b287122`. |
+| 2026-10-17 | T04 | Full-stack Developer | `lib/constants.ts` (APP_CURRENCY/APP_LOCALE), `money.ts` (toCents/formatCents), `allocation.ts` (splitIncome §7 largest remainder), `dates.ts` (parseMonth/parseDate/formatDate/monthLabel/currentMonth/shiftMonth). 21 unit tests green (incl. §8 cases + randomized invariant); lint+build green; commit `6c69de5`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -327,6 +328,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T02 · `npx prisma init` delegated to a remote helper that generated Prisma-7-style scaffolding (`prisma.config.ts`, `prisma-client` generator). Removed `prisma.config.ts` and set generator `prisma-client-js` manually. · reason: `prisma.config.ts` imports `dotenv` (not allowed by D11); classic layout matches §4 (client import from `@prisma/client`).
 - 2026-10-17 · T02 · Bumped dev dep `@types/node` ^20 → ^24.19.2. · reason: vitest 5 peer-requires @types/node ≥22; also matches Node 24 runtime. No new packages added.
 - 2026-10-17 · T02 · `.env` kept local/gitignored, committed `.env.example` instead. Verified Next ("Environments: .env") and Prisma CLI both auto-load it. · reason: §4 requirement + T02 spec.
+- 2026-10-17 · T04 · `formatCents` uses a fixed `en-US` locale + `APP_CURRENCY` and `currentMonth()` uses **UTC** parts · reason: deterministic tests/rendering; consistent with D13 (dates stored as UTC midnights). Currency switch in Q1 stays a one-constant change.
 
 ### 13. Open questions (for the human)
 
@@ -375,3 +377,11 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
   - Node script with `--env-file=.env` counting rows via Prisma Client → `{ categories: 0, incomes: 0, expenses: 0, savings: 0 }` (proves all 4 tables exist and are empty). `npm run db:studio` itself is interactive; QA can confirm the 4 tables in the Studio UI.
   - `npm run build` → exit 0.
 - **Acceptance criteria (§8 T03):** ✅ migration folder created · ✅ 4 empty tables verified (via client counts) · ✅ `npm run build` passes.
+
+### T04 — Money, allocation & date utilities (with unit tests) ✅
+- **Commit:** `6c69de5 T04: money, allocation & date utilities with unit tests`
+- **Files:** `lib/constants.ts` (`APP_CURRENCY="USD"`, `APP_LOCALE="en-US"`), `lib/money.ts` (`toCents` — string/number, half-up rounding, rejects negatives/NaN/malformed, accepts "1,234.56"; `formatCents` via `Intl.NumberFormat`), `lib/allocation.ts` (`splitIncome(amountCents, categories)` — basis-points math + largest remainder, tie-break by lower id, returns `{ allocations, unallocatedCents }`), `lib/dates.ts` (`parseMonth`, `parseDate`, `formatDate`, `monthLabel`, `currentMonth`, `shiftMonth` — all UTC-safe), + `lib/*.test.ts`, `vitest.config.ts` (`passWithNoTests` removed).
+- **Extra (small, used by later tasks):** `parseDate` (validates overflow like 2026-02-30), `shiftMonth`/`currentMonth` (MonthPicker prev/next), `APP_LOCALE`.
+- **Test suite:** 21 tests across 3 files — includes every §8 T04 case: `[33,33,34]` @ 100¢/33.33-33.33-33.34; `[1,0,0]` @ 1¢; Σ=80% → unallocated 20%; randomized 500-iteration invariant `Σ allocations + unallocated == amountCents`; parseMonth Dec→Jan year boundary; tie-break by lower id; money edge cases (`1.005`→101, `0.1+0.2`→30).
+- **Verification evidence:** `npx vitest run --reporter=verbose` → 3 files / 21 tests passed, exit 0; `npm run lint` exit 0; `npm run build` exit 0.
+- **Acceptance criteria (§8 T04):** ✅ all listed cases green · ✅ `npm test` green · ✅ `passWithNoTests` removed.

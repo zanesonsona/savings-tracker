@@ -35,3 +35,8 @@ export function formatCents(cents: number): string {
     currency: APP_CURRENCY,
   }).format(cents / 100);
 }
+
+/** Format basis points as a trimmed percentage string, e.g. 10550 → "105.5". */
+export function formatPercentBp(bp: number): string {
+  return Number((bp / 100).toFixed(2)).toString();
+}
