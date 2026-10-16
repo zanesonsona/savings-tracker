@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T08 — Income UI with split preview · **Progress:** 7/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T09 — Expense API · **Progress:** 8/16 tasks
 
 ### 1. Vision
 
@@ -212,7 +212,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria:** curl checks incl. month filter across a year boundary; invalid amount/date → 400.
 
 #### T08 — Income UI with split preview
-**Status:** ⬜ TODO · **Depends on:** T07, T06 · **Files:** `app/income/page.tsx`, `components/*`
+**Status:** ✅ DONE · **Depends on:** T07, T06 · **Files:** `app/income/page.tsx`, `components/*`
 - Form: amount (accepts `1234.56`, convert with `toCents`), source, date (default today), note. List grouped by month heading, newest first, delete per row.
 - Each income row shows its **computed split** using `splitIncome` + categories from `/api/categories`: per-category chips + "Unallocated" chip when > 0.
 - Empty states: no categories → prompt linking to `/categories`; no incomes → friendly hint.
@@ -320,6 +320,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T05 | Full-stack Developer | Categories API GET/POST + PATCH/DELETE on `[id]`; zod validation (§6 error shape), case-insensitive name checks, Σ%>100.01 guard, 404/409/204 paths. 25/25 curl checks PASS; DB wiped clean after; lint+build green (routes build as ƒ Dynamic); commit `a2ddb5c`. |
 | 2026-10-17 | T06 | Full-stack Developer | Nav (active links) + new layout/light theme; `/categories` client page (create form, inline edit, delete w/ confirm, Total/Unallocated indicator, empty state); Income/Expenses/Savings stubs; `lib/api.ts` fetch helper; `components/EmptyState.tsx`. 35/35 SSR checks PASS; lint+build green; commit `15d68db`. |
 | 2026-10-17 | T07 | Full-stack Developer | Incomes API: GET (newest first, `?month=` UTC filter, 400 on malformed), POST (int cents > 0, date → UTC midnight, source/note limits), DELETE. Shared validation fragments + `parseIdParam`; categories API refactored onto it. 30/30 curl checks PASS incl. year boundary + UTC-midnight storage; commit `25b7ebc`. |
+| 2026-10-17 | T08 | Full-stack Developer | Income UI: amount (`toCents`) / source / date / note form; month-grouped list newest-first with split chips (5000.00 @ 35/25/20/20 → 1750/1250/1000/1000) + Unallocated chip; delete w/ confirm; loading + empty states. New `lib/use-today.ts` hook (`useSyncExternalStore` — satisfies Next 16 `react-hooks/set-state-in-effect`). 19/19 script checks + 22/22 unit tests PASS; DB wiped; lint+build green; commit `8d97367`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -336,6 +337,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T05 · Σ% guard implemented in basis points: reject when `sumBp > 10001` (= 100.01%), exactly as §8 T05 says; duplicate-name checks are exact case-insensitive comparisons (`"Bills"`/`"bills"` collide) · reason: SQLite `@unique` is case-sensitive (no `mode:"insensitive"` on SQLite).
 - 2026-10-17 · T05 · Validation errors return the first zod issue as `"<field>: <message>"` in `{ error }` (§6 shape); PATCH requires at least one field · reason: stays human-readable while identifying the offending field.
 - 2026-10-17 · T06 · Removed the template's `prefers-color-scheme` auto-dark flip and standardized the app on a light slate theme (dark mode is out of scope) · reason: keep one consistent look; avoids half-styled rendering on dark OS themes.
+- 2026-10-17 · T08 · Date defaults ("today") come from a new `lib/use-today.ts` hook built on `useSyncExternalStore` (`""` server snapshot → local `YYYY-MM-DD` after hydration) instead of a mount `useEffect` + setState · reason: Next 16's `react-hooks/set-state-in-effect` lint rule rejects the effect pattern; the store hook is the React-blessed way to render a client-only value with no hydration mismatch, and T10/T12 date pickers will reuse it.
 
 ### 13. Open questions (for the human)
 
@@ -347,7 +349,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 ## Full-stack Developer
 
-> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T01.
+> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T08.
 
 ### T01 — Scaffold Next.js app ✅
 - **Commit:** `ed21810 T01: scaffold Next.js app`
@@ -426,3 +428,13 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
   - `lib/types.ts` — `toIncomeDTO`; `app/api/categories/[id]/route.ts` refactored to shared `parseIdParam`.
 - **Verification evidence:** 30/30 curl checks PASS: happy 201 (stores cents); 0/negative/non-integer cents → 400; `2026-02-30` + malformed dates → 400; 61-char source → 400; GET all → 3 entries newest-first; `?month=2026-10` / `2026-09` / `2025-12` filter correctly (year-boundary case); `2026-01` → `[]`; `2026-13` & `abc` → 400; DB check shows stored date `2026-10-01T00:00:00.000Z` (UTC midnight); DELETE 204 → 404; invalid id 400. Wiped clean after. lint + build exit 0.
 - **Acceptance criteria (§8 T07):** ✅ curl checks incl. month filter across year boundary · ✅ invalid amount/date → 400.
+
+### T08 — Income UI with split preview ✅
+- **Commit:** `8d97367 T08: income UI with split preview`
+- **Files:**
+  - `app/income/page.tsx` — replaces the T06 stub: amount field (accepts `1234.56` via `toCents`), source, date (defaults to local today), optional note; month-grouped list (newest first, `monthLabel` headings, UTC-safe `shortDate`); per-row **split chips** computed live with `splitIncome` over `/api/categories` (color dot + name + `formatCents`) plus an "Unallocated X" chip when `> 0`; delete per row (`window.confirm`); loading/error states; no-categories prompt → `/categories`; no-incomes empty state.
+  - `lib/use-today.ts` — client-only "today" via `useSyncExternalStore` (server snapshot `""`, client snapshot local `YYYY-MM-DD`, module-cached); replaces the mount-effect state pattern that Next 16's `react-hooks/set-state-in-effect` rule now rejects. Reused by T10/T12.
+  - `lib/allocation.test.ts` — adds the T08 acceptance case: 500000¢ @ 35/25/20/20 → [175000, 125000, 100000, 100000], unallocated 0.
+- **Verification evidence:** 19/19 script checks PASS against `npm run dev`: 4 categories (Bills 35 / Needs 25 / Debts 20 / Savings 20) + 5000.00 income seeded via API (all 201); `splitIncome` executed over the **real DB rows** (no hardcoded ids) → Bills 175000 · Needs 125000 · Debts 100000 · Savings 100000, `unallocatedCents: 0`; `/income` SSR 200 and contains "Add income", the split subheading, all three field placeholders and the nav; DB wiped → `category=0 income=0 expense=0 savings=0` (D3). `npm test` → 22/22 (3 files); `npm run lint` + `npm run build` exit 0 (pages ○ static, API routes ƒ Dynamic).
+- **Deferred to QA (T16):** browser click-through of add → chips visible / delete flow (chips render after the client-side fetch, so they are not visible in SSR HTML; the underlying `splitIncome` math + API paths are covered here).
+- **Acceptance criteria (§8 T08):** ✅ 5000.00 @ 35/25/20/20 → 1750/1250/1000/1000 (acceptance unit test + live DB computation) · ✅ totals sum exactly (unallocated 0) · ✅ delete per row wired (API curl-verified in T07; button + confirm + reload implemented) · ✅ month grouping newest-first (API ordering + grouping logic verified).

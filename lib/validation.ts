@@ -95,11 +95,24 @@ export const noteSchema = z
   .max(200, "Note must be 200 characters or fewer")
   .optional();
 
+export const categoryIdSchema = z
+  .number()
+  .int("Category id must be a whole number")
+  .positive("Category id must be greater than zero");
+
 /** POST /api/incomes body. */
 export const incomeCreateSchema = z.object({
   amountCents: moneyAmountSchema,
   source: sourceSchema,
   date: dateSchema,
+  note: noteSchema,
+});
+
+/** POST /api/expenses body. */
+export const expenseCreateSchema = z.object({
+  amountCents: moneyAmountSchema,
+  date: dateSchema,
+  categoryId: categoryIdSchema,
   note: noteSchema,
 });
 

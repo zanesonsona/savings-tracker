@@ -148,3 +148,24 @@ export function toIncomeDTO(income: {
     createdAt: income.createdAt.toISOString(),
   };
 }
+
+/** Map a Prisma Expense (with its included category) to the JSON DTO shape. */
+export function toExpenseDTO(expense: {
+  id: number;
+  amountCents: number;
+  date: Date;
+  note: string | null;
+  categoryId: number;
+  category: { id: number; name: string; kind: string; color: string | null };
+  createdAt: Date;
+}): ExpenseDTO {
+  return {
+    id: expense.id,
+    amountCents: expense.amountCents,
+    date: expense.date.toISOString(),
+    note: expense.note,
+    categoryId: expense.categoryId,
+    category: toCategoryRefDTO(expense.category),
+    createdAt: expense.createdAt.toISOString(),
+  };
+}
