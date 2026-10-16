@@ -1,36 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Savings Tracker
 
-## Getting Started
+A local, single-user web app to plan and track your money: log your income, split it automatically across **your own custom categories** (e.g., Bills, Needs, Debts, Savings) by the percentages you define, then record real expenses and savings deposits/withdrawals and compare plan vs actual on a dashboard.
 
-First, run the development server:
+- **Income splitting** — each income is split live across categories with the largest-remainder method, in whole cents (Σ% ≤ 100; the leftover shows as "Unallocated").
+- **Plan vs actual** — dashboard with allocated/actual/remaining per category, progress bars, and over-budget highlighting.
+- **Savings** — deposits/withdrawals on savings-kind categories with an all-time running balance (negative balances are allowed and shown in red).
+- **No accounts, no auth, no cloud** — one SQLite file, one user, offline.
+
+## Tech stack
+
+| Layer | Choice |
+|-------|--------|
+| Framework | Next.js 16 (App Router, TypeScript, Turbopack) |
+| Styling | Tailwind CSS v4 |
+| Database | SQLite via Prisma 6 (`@prisma/client`) |
+| Validation | zod (all API request bodies/params) |
+| Tests | vitest (unit tests for money/allocation/date helpers) |
+
+## Prerequisites
+
+- Node.js 22+ and npm (developed on Node 24 LTS).
+- No database server required — Prisma uses a local SQLite file (`prisma/dev.db`).
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env        # DATABASE_URL="file:./dev.db"
+npm run db:migrate          # creates prisma/dev.db and applies migrations
+npm run dev                 # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app starts **empty**: open the Dashboard and follow the onboarding link to create your own categories first (e.g., Bills 35 / Needs 25 / Debts 20 / Savings 20 — mark the last one as *Savings* kind).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Optional: demo data (DEV ONLY)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run db:seed
+```
 
-## Learn More
+This wipes all tables and inserts a small demo dataset (categories 35/25/20/20, 2 incomes, 4 expenses, 1 savings deposit dated relative to the current month). Re-run it anytime to reset. It is intentionally opt-in — the app itself always starts empty.
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Script | What it does |
+|--------|--------------|
+| `npm run dev` | Start the dev server (Turbopack) on port 3000 |
+| `npm run build` | Production build |
+| `npm run start` | Serve the production build |
+| `npm run lint` | ESLint (flat config, next preset) |
+| `npm test` | Run unit tests once (vitest) |
+| `npm run test:watch` | Unit tests in watch mode |
+| `npm run db:migrate` | `prisma migrate dev` — apply/create migrations |
+| `npm run db:seed` | DEV ONLY: wipe + insert demo data |
+| `npm run db:studio` | Open Prisma Studio against the SQLite file |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Architecture map
 
-## Deploy on Vercel
+```
+app/
+  page.tsx              Dashboard (month picker, summary cards, per-category plan vs actual)
+  income/page.tsx       Income list with split preview chips
+  expenses/page.tsx     Expenses with month + category filters
+  savings/page.tsx      Savings balance, deposits/withdrawals history
+  categories/page.tsx   Create/edit/delete categories, Σ% indicator
+  api/
+    categories/         GET/POST + PATCH/DELETE [id]   (Σ% ≤ 100.01, unique names, delete guarded)
+    incomes/            GET (?month=)/POST + DELETE [id]
+    expenses/           GET (?month=&categoryId=)/POST + DELETE [id]   (EXPENSE categories only)
+    savings/            GET (?month= → entries + balance + month net)/POST + DELETE [id]
+    overview/           GET (?month=) → dashboard aggregation payload
+lib/
+  money.ts              integer-cent parsing/formatting (toCents/formatCents)
+  allocation.ts         splitIncome — largest-remainder split (§7)
+  dates.ts              UTC calendar-date helpers (parse/format month & day)
+  validation.ts         zod schemas shared by all API routes
+  types.ts              API DTO types + Prisma→DTO mappers
+  api.ts                tiny fetch helper surfacing `{ error }` messages
+  use-today.ts          client-only "today" (SSR-safe via useSyncExternalStore)
+  use-current-month.ts  client-only "current month" (same pattern)
+components/
+  Nav.tsx               top navigation with active-route highlighting
+  EmptyState.tsx        shared empty-state card
+  ProgressBar.tsx       thin progress bar (red over 100%)
+prisma/
+  schema.prisma         4 models: Category, Income, Expense, SavingsEntry
+  seed.ts               DEV-ONLY demo seeder
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Money & data rules (short version)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- All amounts are stored as **integer cents**; dates are plain calendar days stored as UTC midnights.
+- `Category.kind` is `"EXPENSE" | "SAVINGS"`; expenses only accept EXPENSE categories, savings entries only SAVINGS ones.
+- Allocations are computed **live** from the current percentages (editing a % re-computes history — by design).
+- Savings balance = Σ deposits − Σ withdrawals across all savings categories, all-time.
+
+## Testing
+
+```bash
+npm test                    # unit tests (money, allocation, dates)
+npm run lint                # ESLint
+npm run build               # type-check + production build
+```
