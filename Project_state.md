@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T13 — Overview (dashboard) API · **Progress:** 12/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T14 — Dashboard UI · **Progress:** 13/16 tasks
 
 ### 1. Vision
 
@@ -247,7 +247,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria (browser):** deposit 1000 then withdraw 200 → balance 800; list updates; delete works.
 
 #### T13 — Overview (dashboard) API
-**Status:** ⬜ TODO · **Depends on:** T07, T09, T11, T05 · **Files:** `app/api/overview/route.ts`
+**Status:** ✅ DONE · **Depends on:** T07, T09, T11, T05 · **Files:** `app/api/overview/route.ts`
 - GET `?month=YYYY-MM` (default = server's current month) → fixed shape:
 ```json
 {
@@ -325,6 +325,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T10 | Full-stack Developer | Expense UI: month prev/next (client-only default via new `lib/use-current-month.ts`), category filter, day-grouped list (badge + note + amount + delete w/ confirm), live count + total line, amount/category/date/note form (EXPENSE-kind only), empty states (no categories / no match / empty month). 17/17 script checks (SSR + UI query smoke) PASS; DB wiped; lint+build green; commit `cc8ff36`. |
 | 2026-10-17 | T11 | Full-stack Developer | Savings API: GET (month entries newest-first w/ category, all-time `balanceCents`, `monthNetCents`; `?month=` defaults to current UTC month) / POST (zod cents/direction/date/categoryId/note; non-SAVINGS kind → 400, unknown → 404) / DELETE. Negative balances allowed (D7, verified −3700). 41/41 curl checks PASS; DB wiped; lint+build green; commit `a41677f`. |
 | 2026-10-17 | T12 | Full-stack Developer | Savings UI: big all-time balance card (red when negative) + month-net line, month prev/next, DEPOSIT/WITHDRAWAL toggle, amount/category/date/note form (SAVINGS-kind only), history list (+green / −red) with delete, empty states. 20/20 script checks (SSR + UI query smoke incl. 1000→200→800) PASS; DB wiped; lint+build green; commit `27b8ed2`. |
+| 2026-10-17 | T13 | Full-stack Developer | Overview API: month payload `{month, incomeTotalCents, unallocatedCents, categories[allocated/actual/remaining/progress], totals{spent,netSaved}, savingsBalanceCents}`; allocations recomputed live via `splitIncome` (D6), savings actual = month net, balance all-time (D7). 53/53 curl checks PASS (Oct/Sep/Dec-2025/Jan-2026 + zero-category payload + 400s); DB wiped; lint+build green; commit `83c9c7b`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -356,7 +357,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 ## Full-stack Developer
 
-> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T12.
+> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T13.
 
 ### T01 — Scaffold Next.js app ✅
 - **Commit:** `ed21810 T01: scaffold Next.js app`
@@ -483,3 +484,10 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Verification evidence:** 20/20 script checks PASS against `npm run dev`: `/savings` SSR 200 with all static UI strings (balance card label, "Net in", form heading, Deposit/Withdrawal toggles, amount/note placeholders, month buttons, subheading) and stub text gone; seeded a Savings category + deposit 1000.00 + withdrawal 200.00 in the current month; the exact page query `GET /api/savings?month=<current>` returns **balance 80000 (1000 − 200), monthNet 80000**, 2 entries with both directions — matching the §8 T12 acceptance numbers. DB wiped → all counts 0. `npm test` 22/22; lint + build exit 0 (`/savings` ○ static).
 - **Deferred to QA (T16):** browser click-through of the deposit/withdraw toggle flow, negative-balance red styling, delete (data rendering is client-side; the query + math are covered here and in T11).
 - **Acceptance criteria (§8 T12):** ✅ deposit 1000 then withdraw 200 → balance 800 (curl-proven through the page's exact query) · ✅ list updates on reload after add/delete (implemented; visual check QA) · ✅ delete wired (API 204/404 verified in T11; confirm + reload implemented).
+
+### T13 — Overview (dashboard) API ✅
+- **Commit:** `83c9c7b T13: overview API`
+- **Files:**
+  - `app/api/overview/route.ts` — GET (`?month=YYYY-MM`, default current UTC month; malformed → 400) builds the §8 fixed shape: `month`, `incomeTotalCents`, `unallocatedCents`, `categories[]` (`id, name, kind, color, percentage, allocatedCents, actualCents, remainingCents, progress`), `totals { spentCents, netSavedCents }`, `savingsBalanceCents`. Allocations run `splitIncome` live per month income against current percentages (D6); `actualCents` = Σ month expenses (EXPENSE) or month net deposits − withdrawals (SAVINGS, D7); `progress` = actual/allocated (0 when allocated = 0); all-time balance via `groupBy(direction)`.
+- **Verification evidence:** 53/53 curl checks PASS against `npm run dev` — hand-checked seeded scenario 35/25/20/20 with Oct income 5000.00: Bills allocated **175000**, actual 20000, remaining 155000, progress 20000/175000 exact; Needs/Debts allocated 125000/100000 actual 0; Savings allocated 100000, actual 80000 (1000 deposit − 200 withdrawal), remaining 20000, progress 0.8; `unallocatedCents` 0; `totals.spentCents` 20000; `totals.netSavedCents` 80000 (month) while `savingsBalanceCents` 130000 (all-time incl. Sep deposit 500.00) — all-time vs month distinction proven. Sep month: allocations 20% of 1000.00, Savings actual 50000 → remaining −30000, progress 2.5, zero leakage from Oct. **Year boundary:** Dec 2025 income/expense counted only in Dec (totals 5000), Jan 2026 all zeros; balance persists. Malformed months → 400. **Zero-category payload:** `categories: []`, incomeTotal intact, `unallocatedCents` = full income, totals 0/0, HTTP 200 (no 500). DB wiped → all counts 0. `npm test` 22/22; lint + build exit 0 (`/api/overview` ƒ Dynamic).
+- **Acceptance criteria (§8 T13):** ✅ verified by hand against seeded data incl. a year-boundary month · ✅ zero-category app returns a valid empty payload (no 500).
