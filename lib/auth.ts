@@ -1,4 +1,5 @@
-// Auth core for Phase 2 (T22): password hashing + signed session tokens.
+// Auth core for Phase 2: password hashing + signed session tokens (T22) and
+// session lookup + API guards (T23).
 //
 // Decisions: D14 (username/password accounts), D17 (no new dependencies —
 // `node:crypto` scrypt + HMAC-SHA256-signed httpOnly cookies).
@@ -16,7 +17,10 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { promisify } from "node:util";
+import type { User } from "@prisma/client";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { prisma } from "./prisma";
 
 const scrypt = promisify(scryptCallback);
 
@@ -172,4 +176,52 @@ export async function setSessionCookie(userId: number): Promise<void> {
 export async function clearSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE_NAME);
+}
+
+// ---------------------------------------------------------------------------
+// Session lookup + API guards (T23 — consumed by T25–T27)
+// ---------------------------------------------------------------------------
+
+/**
+ * The session user re-read from the DB (any status), or `null` when signed
+ * out. Expired / tampered / unknown-user sessions all yield `null` (D17).
+ */
+export async function getSessionUser(): Promise<User | null> {
+  const cookieStore = await cookies();
+  const session = verifySessionToken(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+  if (!session) return null;
+  return prisma.user.findUnique({ where: { id: session.uid } });
+}
+
+/** Either the signed-in user or a ready-to-return error response. */
+export type AuthResult = { user: User } | { response: NextResponse };
+
+function authError(message: string, status: 401 | 403): { response: NextResponse } {
+  return { response: NextResponse.json({ error: message }, { status }) };
+}
+
+/**
+ * API guard: the signed-in `APPROVED` user, or an error response.
+ *
+ * ```ts
+ * const auth = await requireUser();
+ * if ("response" in auth) return auth.response;
+ * const user = auth.user;
+ * ```
+ */
+export async function requireUser(): Promise<AuthResult> {
+  const user = await getSessionUser();
+  if (!user) return authError("Authentication required", 401);
+  if (user.status === "PENDING") return authError("Account pending admin approval", 403);
+  if (user.status === "REJECTED") return authError("This account registration was declined", 403);
+  if (user.status !== "APPROVED") return authError("Account is not approved", 403);
+  return { user };
+}
+
+/** API guard: like `requireUser`, plus `role === "ADMIN"` (T27). */
+export async function requireAdmin(): Promise<AuthResult> {
+  const result = await requireUser();
+  if ("response" in result) return result;
+  if (result.user.role !== "ADMIN") return authError("Admin access required", 403);
+  return result;
 }

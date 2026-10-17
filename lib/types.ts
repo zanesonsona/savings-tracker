@@ -90,6 +90,37 @@ export interface ApiError {
   error: string;
 }
 
+export type UserRole = "USER" | "ADMIN";
+export type UserStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface UserDTO {
+  id: number;
+  username: string;
+  role: UserRole;
+  status: UserStatus;
+  createdAt: string;
+  decidedAt: string | null;
+}
+
+/** Map a Prisma User to the JSON DTO shape (never exposes the password hash). */
+export function toUserDTO(user: {
+  id: number;
+  username: string;
+  role: string;
+  status: string;
+  createdAt: Date;
+  decidedAt: Date | null;
+}): UserDTO {
+  return {
+    id: user.id,
+    username: user.username,
+    role: user.role as UserRole,
+    status: user.status as UserStatus,
+    createdAt: user.createdAt.toISOString(),
+    decidedAt: user.decidedAt ? user.decidedAt.toISOString() : null,
+  };
+}
+
 /** Map a Prisma Category (+ counts) to the JSON DTO shape. */
 export function toCategoryDTO(
   category: {

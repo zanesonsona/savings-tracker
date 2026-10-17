@@ -129,3 +129,32 @@ export const savingsCreateSchema = z.object({
 export function emptyToNull(value: string | undefined): string | null {
   return value?.trim() ? value.trim() : null;
 }
+
+// --- Auth (T23) ---
+
+/** Allowed username characters: letters, digits, dot, underscore, hyphen. */
+export const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
+
+export const usernameSchema = z
+  .string()
+  .trim()
+  .min(3, "Username must be at least 3 characters")
+  .max(30, "Username must be 30 characters or fewer")
+  .regex(USERNAME_PATTERN, "Username may only contain letters, digits, dots, underscores and hyphens");
+
+export const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(200, "Password must be 200 characters or fewer");
+
+/** POST /api/auth/register body. */
+export const registerSchema = z.object({
+  username: usernameSchema,
+  password: passwordSchema,
+});
+
+/** POST /api/auth/login body — non-empty fields; wrong values → 401. */
+export const loginSchema = z.object({
+  username: z.string().trim().min(1, "Username is required").max(30, "Username must be 30 characters or fewer"),
+  password: z.string().min(1, "Password is required"),
+});
