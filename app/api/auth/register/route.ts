@@ -6,10 +6,12 @@ import { registerSchema, zodErrorMessage } from "@/lib/validation";
 
 // POST /api/auth/register → 201 { user, message }.
 //
-// The FIRST-ever account becomes the app admin (ADMIN + APPROVED, D15) and
-// claims any legacy NULL-owner rows left from the pre-accounts era (T21/D21).
-// Every later registration lands as USER + PENDING and cannot sign in until an
-// admin approves it (T27). Neither path auto-logs-in.
+// The FIRST-ever account becomes the app admin (ADMIN + APPROVED, D15). Every
+// later registration lands as USER + PENDING and cannot sign in until an admin
+// approves it (T27). Neither path auto-logs-in.
+//
+// Note: the D21 "claim legacy NULL-owner rows" step of the T21→T26 sequence is
+// complete — `userId` is required now (T26), so such rows can no longer exist.
 export async function POST(request: Request) {
   let body: unknown;
   try {
@@ -43,14 +45,6 @@ export async function POST(request: Request) {
     const admin = await prisma.user.create({
       data: { username, passwordHash, role: "ADMIN", status: "APPROVED" },
     });
-
-    // Bootstrap claim: adopt rows written before accounts existed (T21/D21).
-    await prisma.$transaction([
-      prisma.category.updateMany({ where: { userId: null }, data: { userId: admin.id } }),
-      prisma.income.updateMany({ where: { userId: null }, data: { userId: admin.id } }),
-      prisma.expense.updateMany({ where: { userId: null }, data: { userId: admin.id } }),
-      prisma.savingsEntry.updateMany({ where: { userId: null }, data: { userId: admin.id } }),
-    ]);
 
     return NextResponse.json(
       { user: toUserDTO(admin), message: "Admin account created — sign in to continue." },

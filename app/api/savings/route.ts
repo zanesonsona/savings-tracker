@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { currentMonth, parseDate, parseMonth } from "@/lib/dates";
 import { toSavingsEntryDTO, type SavingsListResponse } from "@/lib/types";
@@ -25,9 +26,13 @@ async function netCents(where: Prisma.SavingsEntryWhereInput = {}): Promise<numb
   return net;
 }
 
-// GET /api/savings?month=YYYY-MM → entries of the month (category included, newest first)
-// plus all-time balance (D7) and the month's net. `month` defaults to the current UTC month.
+// GET /api/savings?month=YYYY-MM → the session account's entries of the month (category
+// included, newest first) plus all-time balance (D7) and the month's net.
+// `month` defaults to the current UTC month.
 export async function GET(request: Request) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   const monthParam = new URL(request.url).searchParams.get("month") ?? currentMonth();
 
   const parsed = monthSchema.safeParse(monthParam);
@@ -35,7 +40,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: zodErrorMessage(parsed.error) }, { status: 400 });
   }
   const { start, end } = parseMonth(parsed.data);
-  const monthWhere: Prisma.SavingsEntryWhereInput = { date: { gte: start, lt: end } };
+  const monthWhere: Prisma.SavingsEntryWhereInput = {
+    userId: auth.user.id,
+    date: { gte: start, lt: end },
+  };
 
   const [entries, monthNetCents, balanceCents] = await Promise.all([
     prisma.savingsEntry.findMany({
@@ -44,7 +52,7 @@ export async function GET(request: Request) {
       include: { category: true },
     }),
     netCents(monthWhere),
-    netCents(),
+    netCents({ userId: auth.user.id }),
   ]);
 
   const body: SavingsListResponse = {
@@ -58,6 +66,9 @@ export async function GET(request: Request) {
 // POST /api/savings → 201 with the created SavingsEntryDTO.
 // Only kind = "SAVINGS" categories may be used (D8); negative balances allowed (D7).
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -71,7 +82,8 @@ export async function POST(request: Request) {
   }
   const { amountCents, direction, date, categoryId, note } = parsed.data;
 
-  const category = await prisma.category.findUnique({ where: { id: categoryId } });
+  // Scoped: a category id from another account behaves like a missing one → 404 (D16).
+  const category = await prisma.category.findFirst({ where: { id: categoryId, userId: auth.user.id } });
   if (!category) {
     return NextResponse.json({ error: "Category not found" }, { status: 404 });
   }
@@ -90,6 +102,7 @@ export async function POST(request: Request) {
       date: parseDate(date),
       note: emptyToNull(note),
       categoryId,
+      userId: auth.user.id,
     },
     include: { category: true },
   });

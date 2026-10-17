@@ -1,12 +1,12 @@
 # Savings Tracker
 
-A local, single-user web app to plan and track your money: log your income, split it automatically across **your own custom categories** (e.g., Bills, Needs, Debts, Savings) by the percentages you define, then record real expenses and savings deposits/withdrawals and compare plan vs actual on a dashboard.
+A local web app to plan and track your money: create an account, log your income, split it automatically across **your own custom categories** (e.g., Bills, Needs, Debts, Savings) by the percentages you define, then record real expenses and savings deposits/withdrawals and compare plan vs actual on a dashboard.
 
 - **Income splitting** — each income is split live across categories with the largest-remainder method, in whole cents (Σ% ≤ 100; the leftover shows as "Unallocated").
 - **Plan vs actual** — dashboard with allocated/actual/remaining per category, progress bars, and over-budget highlighting.
 - **Savings** — deposits/withdrawals on savings-kind categories with an all-time running balance (negative balances are allowed and shown in red).
-- **No accounts, no auth, no cloud** — one SQLite file, one user, offline.
-- **Ships empty by design** — no preset categories and no demo data; you create your own buckets on first run.
+- **Accounts with admin approval** — the first account becomes the admin; later registrations wait for approval, and every account only ever sees its own data. One SQLite file, no cloud.
+- **Ships empty by design** — no preset users, categories, or demo data; the first account you register becomes the admin, then you create your own buckets.
 
 **Contents:** [Setup](#setup) · [Usage](#usage-first-run-walkthrough) · [Demo data](#optional-demo-data-dev-only) · [Configuration](#configuration) · [API reference](#api-reference) · [Docker](#run-with-docker) · [Scripts](#scripts) · [Architecture](#architecture-map) · [Testing](#testing)
 
@@ -18,7 +18,7 @@ A local, single-user web app to plan and track your money: log your income, spli
 | Styling | Tailwind CSS v4 |
 | Database | SQLite via Prisma 6 (`@prisma/client`) |
 | Validation | zod (all API request bodies/params) |
-| Tests | vitest (money/allocation/date helpers + categories route regression tests) |
+| Tests | vitest (money/allocation/date/auth helpers + route regression tests: category guards, session + per-account isolation) |
 
 ## Prerequisites
 
@@ -35,16 +35,17 @@ npm run db:migrate          # creates prisma/dev.db and applies migrations
 npm run dev                 # http://localhost:3000
 ```
 
-The app starts **empty** (no categories, no entries). Continue with the usage walkthrough below.
+The app starts **empty** (no users, no categories, no entries) — the first account you register becomes the admin. Continue with the usage walkthrough below.
 
 ## Usage (first run walkthrough)
 
-1. **Create your categories** — open `/categories` (or the onboarding link on the dashboard). For each category set a name, a kind (**Expense** for spending buckets, **Savings** for savings buckets), a percentage of income, and an optional color. The running total must stay at or below **100%**; anything below 100% shows as **Unallocated** and is assigned to no category.
-2. **Log income** — open `/income`. Enter an amount (e.g. `5000.00`), an optional source, a date, and an optional note. Every income row shows its computed split across your categories (plus an *Unallocated* chip when Σ% < 100%).
-3. **Log expenses** — open `/expenses`. Expenses can only be filed against Expense-kind categories. Filter by month and category; the list and live total follow the active filters.
-4. **Track savings** — open `/savings`. Record deposits and withdrawals against Savings-kind categories. The balance card shows the **all-time** net (red when negative) and the month's net.
-5. **Read the dashboard** — open `/` (Dashboard). Pick a month and compare allocated vs actual per category, with Income / Spent / Net saved summary cards and the all-time savings balance.
-6. **Fix mistakes by deleting** — entries are **create + delete only** (no editing in the MVP). Deleting an income/expense/savings entry is always allowed; deleting a category is blocked while it still has entries, and changing a category's kind is blocked while entries of its current kind exist. Allocations are recomputed live from the current percentages, so changing a % re-computes the plan for every month.
+1. **Create an account** — open `/register`. The first account ever created becomes the app **admin** and is approved immediately; every later account lands as **pending** until an admin approves it at `/admin/users` (T27) — pending and declined accounts cannot sign in. Sign in at `/login`; the session lasts 30 days (httpOnly `st_session` cookie, signed with `SESSION_SECRET`). Each account only ever sees its own data — the admin included.
+2. **Create your categories** — open `/categories` (or the onboarding link on the dashboard). For each category set a name, a kind (**Expense** for spending buckets, **Savings** for savings buckets), a percentage of income, and an optional color. The running total must stay at or below **100%** per account; anything below 100% shows as **Unallocated** and is assigned to no category.
+3. **Log income** — open `/income`. Enter an amount (e.g. `5000.00`), an optional source, a date, and an optional note. Every income row shows its computed split across your categories (plus an *Unallocated* chip when Σ% < 100%).
+4. **Log expenses** — open `/expenses`. Expenses can only be filed against Expense-kind categories. Filter by month and category; the list and live total follow the active filters.
+5. **Track savings** — open `/savings`. Record deposits and withdrawals against Savings-kind categories. The balance card shows the **all-time** net (red when negative) and the month's net.
+6. **Read the dashboard** — open `/` (Dashboard). Pick a month and compare allocated vs actual per category, with Income / Spent / Net saved summary cards and the all-time savings balance.
+7. **Fix mistakes by deleting** — entries are **create + delete only** (no editing in the MVP). Deleting an income/expense/savings entry is always allowed; deleting a category is blocked while it still has entries, and changing a category's kind is blocked while entries of its current kind exist. Allocations are recomputed live from the current percentages, so changing a % re-computes the plan for every month.
 
 ## Optional: demo data (DEV ONLY)
 
@@ -52,7 +53,7 @@ The app starts **empty** (no categories, no entries). Continue with the usage wa
 npm run db:seed
 ```
 
-This wipes all tables and inserts a small demo dataset (categories 35/25/20/20, 2 incomes, 4 expenses, 1 savings deposit dated relative to the current month). Re-run it anytime to reset. It is intentionally opt-in — the app itself always starts empty — and it refuses to run when `NODE_ENV=production`.
+This wipes **all tables — users included** — and inserts a small demo dataset owned by a demo **admin** account: categories 35/25/20/20, 2 incomes, 4 expenses, 1 savings deposit dated relative to the current month. Sign in with **`demo` / `demo12345`**. Re-run it anytime to reset (it deletes any accounts you created). It is intentionally opt-in — the app itself always starts empty — and it refuses to run when `NODE_ENV=production`.
 
 ## Configuration
 
@@ -80,7 +81,7 @@ Source-level configuration lives in `lib/constants.ts`:
 
 ### Conventions
 
-- **JSON in / out; no authentication** (single-user local app). All routes live under `/api`.
+- **JSON in / out; session cookie required.** Every data route requires a signed-in, approved account (`401 Authentication required` otherwise) and reads/writes **only the session account's rows**; another account's id behaves like a missing one (`404`). Auth endpoints live under `/api/auth/*` — see [Authentication](#authentication).
 - **Amounts are integer cents.** `amountCents: 500000` is ₱5,000.00. The API never accepts decimal amounts — clients convert (the UI uses `toCents`).
 - **Dates** are `YYYY-MM-DD` strings in requests; they are stored as UTC midnight and returned as ISO strings (`"2026-10-01T00:00:00.000Z"`).
 - **Month filters** are `YYYY-MM` (months `01`–`12`) and match `[1st 00:00 UTC, 1st of next month 00:00 UTC)`.
@@ -91,10 +92,24 @@ Source-level configuration lives in `lib/constants.ts`:
 | Status | Meaning |
 |--------|---------|
 | `400` | Invalid JSON body, validation failure, Σ% would exceed 100, or wrong category kind for the entry type |
-| `404` | Unknown id (including an unknown `categoryId`) |
-| `409` | Conflict: duplicate category name, category still in use, or blocked kind change |
+| `401` | Missing/invalid session (`Authentication required`) |
+| `403` | Signed in but not allowed: `Account pending admin approval`, `This account registration was declined`, `Admin access required` |
+| `404` | Unknown id — including another account's id and an unknown `categoryId` |
+| `409` | Conflict: duplicate category name (per account), username already taken, category still in use, or blocked kind change |
 
 Validation failures name the first offending field, e.g. `{ "error": "amountCents: Amount must be greater than zero" }`.
+
+### Authentication
+
+Accounts are local (no email): **the first account ever registered becomes the app admin** (`ADMIN`/`APPROVED`); every later account is created as `USER`/`PENDING` and cannot sign in until an admin approves it (approval UI: T27). Sessions are a signed, httpOnly `st_session` cookie (HMAC-SHA256 with `SESSION_SECRET`, 30-day TTL); passwords are stored salted+hashed with `node:crypto` scrypt (`scrypt$salt$hash`) — never in plaintext.
+
+**`POST /api/auth/register`** → `201 { user, message }`. Body: `username` (3–30 chars: letters, digits, `. _ -`) and `password` (≥ 8 chars). The first account gets `Admin account created — sign in to continue.`; later accounts get `Account created — an admin must approve it before you can sign in.` Neither path auto-logs-in, and the route never touches an existing session cookie. Errors: `400` validation; `409 Username "x" is already taken` (case-insensitive).
+
+**`POST /api/auth/login`** → `200 { user }` and sets the session cookie. Errors: `401 Invalid username or password`; `403 Account pending admin approval`; `403 This account registration was declined`.
+
+**`POST /api/auth/logout`** → `204` and clears the cookie (idempotent). **`GET /api/auth/me`** → `200 { user }` for the session account; `401 Authentication required` otherwise.
+
+`user` is always a `UserDTO`: `{ id, username, role, status, createdAt, decidedAt }` — the password hash is never returned.
 
 ### Categories
 
@@ -282,31 +297,39 @@ Field semantics:
 ### End-to-end example (curl)
 
 ```bash
+# 0. Register the first account (becomes the admin) and sign in — keep the cookie
+curl -s -c cookies.txt -X POST http://localhost:3000/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"adminpassword1"}'
+curl -s -c cookies.txt -X POST http://localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"adminpassword1"}'
+
 # 1. Create two categories (Σ = 60%, the rest stays Unallocated)
-curl -s -X POST http://localhost:3000/api/categories \
+curl -s -b cookies.txt -X POST http://localhost:3000/api/categories \
   -H 'Content-Type: application/json' \
   -d '{"name":"Bills","percentage":40,"kind":"EXPENSE","color":"#ef4444"}'
-curl -s -X POST http://localhost:3000/api/categories \
+curl -s -b cookies.txt -X POST http://localhost:3000/api/categories \
   -H 'Content-Type: application/json' \
   -d '{"name":"Savings","percentage":20,"kind":"SAVINGS","color":"#22c55e"}'
 
 # 2. Log an income of ₱5,000.00
-curl -s -X POST http://localhost:3000/api/incomes \
+curl -s -b cookies.txt -X POST http://localhost:3000/api/incomes \
   -H 'Content-Type: application/json' \
   -d '{"amountCents":500000,"source":"Salary","date":"2026-10-01"}'
 
 # 3. Log a ₱200.00 expense on Bills (id 1)
-curl -s -X POST http://localhost:3000/api/expenses \
+curl -s -b cookies.txt -X POST http://localhost:3000/api/expenses \
   -H 'Content-Type: application/json' \
   -d '{"amountCents":20000,"categoryId":1,"date":"2026-10-05","note":"Electricity"}'
 
 # 4. Deposit ₱1,000.00 into Savings (id 2)
-curl -s -X POST http://localhost:3000/api/savings \
+curl -s -b cookies.txt -X POST http://localhost:3000/api/savings \
   -H 'Content-Type: application/json' \
   -d '{"amountCents":100000,"direction":"DEPOSIT","categoryId":2,"date":"2026-10-02"}'
 
 # 5. Read the dashboard payload for the month
-curl -s "http://localhost:3000/api/overview?month=2026-10"
+curl -s -b cookies.txt "http://localhost:3000/api/overview?month=2026-10"
 ```
 
 The overview response matches the sample payload above (Bills allocated 200000 / actual 20000; Savings allocated 100000 / actual 100000; `unallocatedCents` 200000).
@@ -324,7 +347,7 @@ docker run --rm -p 3000:3000 \
 - The container runs in production mode, so `SESSION_SECRET` is required (sign-in fails fast without it). Pass a **stable** value — sessions are signed with it, so changing it signs everyone out.
 
 - Multi-stage image built on Next.js **standalone output**; the container applies pending Prisma migrations automatically on startup and runs as the non-root `node` user.
-- The SQLite database is created at `/app/data/dev.db` **inside the container** (override with the `DATABASE_URL` env var); the `savings-data` volume keeps it across restarts and upgrades. A fresh volume starts **empty** — create your categories in the UI.
+- The SQLite database is created at `/app/data/dev.db` **inside the container** (override with the `DATABASE_URL` env var); the `savings-data` volume keeps it across restarts and upgrades. A fresh volume starts **empty** — register the first account (it becomes the admin), then create your categories.
 - To reset the data: stop the container and run `docker volume rm savings-data`.
 
 ## Scripts
@@ -345,18 +368,27 @@ docker run --rm -p 3000:3000 \
 
 ```
 app/
-  page.tsx              Dashboard (month picker, summary cards, per-category plan vs actual)
-  income/page.tsx       Income list with split preview chips
-  expenses/page.tsx     Expenses with month + category filters
-  savings/page.tsx      Savings balance, deposits/withdrawals history
-  categories/page.tsx   Create/edit/delete categories, Σ% indicator
+  (app)/                signed-in area (URLs unchanged; layout = Nav + secure session guard)
+    layout.tsx          re-reads the session from the DB; missing/non-APPROVED → /login
+    page.tsx            Dashboard (month picker, summary cards, per-category plan vs actual)
+    income/page.tsx     Income list with split preview chips
+    expenses/page.tsx   Expenses with month + category filters
+    savings/page.tsx    Savings balance, deposits/withdrawals history
+    categories/page.tsx Create/edit/delete categories, Σ% indicator
+    admin/users/page.tsx Admin-only member list (T25 stub; real UI in T27)
+  (auth)/               signed-out chrome (centered card, no nav)
+    login/page.tsx      Sign-in form
+    register/page.tsx   Registration form (admin-vs-pending success states)
   api/
-    categories/         GET/POST + PATCH/DELETE [id]   (Σ% ≤ 100, unique names, delete/kind-change guarded)
+    auth/               register/login/logout/me (session cookie; first account = admin)
+    categories/         GET/POST + PATCH/DELETE [id]   (401 without session; per-account Σ% ≤ 100 + names)
     incomes/            GET (?month=)/POST + DELETE [id]
     expenses/           GET (?month=&categoryId=)/POST + DELETE [id]   (EXPENSE categories only)
     savings/            GET (?month= → entries + balance + month net)/POST + DELETE [id]
-    overview/           GET (?month=) → dashboard aggregation payload
+    overview/           GET (?month=) → dashboard aggregation payload (session account only)
+proxy.ts                cookie-only optimistic redirects for app routes (Next 16 proxy; no DB)
 lib/
+  auth.ts               scrypt password hashing, session token sign/verify, cookie helpers, requireUser/requireAdmin
   constants.ts          APP_CURRENCY / APP_LOCALE (money formatting switches)
   money.ts              integer-cent parsing/formatting (toCents/formatCents)
   allocation.ts         splitIncome — largest-remainder split, integer cents
@@ -367,13 +399,16 @@ lib/
   use-today.ts          client-only "today" (SSR-safe via useSyncExternalStore)
   use-current-month.ts  client-only "current month" (same pattern)
 components/
-  Nav.tsx               top navigation with active-route highlighting
+  AuthCard.tsx          centered card shell for the auth pages
+  LoginForm.tsx         sign-in form (inline errors, loading state)
+  RegisterForm.tsx      registration form (success states for admin vs pending)
+  Nav.tsx               session-aware nav: username, Log out, Admin link (ADMIN only)
   EmptyState.tsx        shared empty-state card
   ProgressBar.tsx       thin progress bar (red over 100%)
 prisma/
-  schema.prisma         4 models: Category, Income, Expense, SavingsEntry
-  migrations/           init migration (applied by db:migrate / container start)
-  seed.ts               DEV-ONLY demo seeder
+  schema.prisma         5 models: User + Category, Income, Expense, SavingsEntry (required userId)
+  migrations/           init + phase-2 migrations (applied by db:migrate / container start)
+  seed.ts               DEV-ONLY demo seeder (demo admin + attached dataset)
 Dockerfile              multi-stage production image (standalone output; migrations on start)
 docker-entrypoint.sh    runs `prisma migrate deploy`, then the Next.js server
 ```
@@ -382,10 +417,11 @@ docker-entrypoint.sh    runs `prisma migrate deploy`, then the Next.js server
 
 | Model | Key fields | Notes |
 |-------|------------|-------|
-| `Category` | `id`, `name` (unique), `percentage`, `kind` (`EXPENSE`/`SAVINGS`), `color`, `createdAt` | No presets — a fresh install has zero rows. `kind` is a `String` (SQLite has no enums) validated by zod. |
-| `Income` | `id`, `amountCents`, `source`, `date`, `note`, `createdAt` | The split is never stored; allocations are computed live. |
-| `Expense` | `id`, `amountCents`, `date`, `note`, `categoryId`, `createdAt` | EXPENSE-kind categories only. |
-| `SavingsEntry` | `id`, `amountCents`, `direction` (`DEPOSIT`/`WITHDRAWAL`), `date`, `note`, `categoryId`, `createdAt` | SAVINGS-kind categories only. |
+| `User` | `id`, `username` (unique), `passwordHash`, `role` (`USER`/`ADMIN`), `status` (`PENDING`/`APPROVED`/`REJECTED`), `createdAt`, `decidedAt` | First-ever registration → `ADMIN`/`APPROVED`. Hash format: `scrypt$salt$hash`. All data rows reference it via required `userId` (`ON DELETE CASCADE`). |
+| `Category` | `id`, `name`, `percentage`, `kind` (`EXPENSE`/`SAVINGS`), `color`, `createdAt`, `userId` | No presets — a fresh install has zero rows. Names are unique **per account** (`@@unique([userId, name])`) and Σ% ≤ 100 is enforced per account. `kind` is a `String` (SQLite has no enums) validated by zod. |
+| `Income` | `id`, `amountCents`, `source`, `date`, `note`, `createdAt`, `userId` | The split is never stored; allocations are computed live. |
+| `Expense` | `id`, `amountCents`, `date`, `note`, `categoryId`, `createdAt`, `userId` | EXPENSE-kind categories of the same account only. |
+| `SavingsEntry` | `id`, `amountCents`, `direction` (`DEPOSIT`/`WITHDRAWAL`), `date`, `note`, `categoryId`, `createdAt`, `userId` | SAVINGS-kind categories of the same account only. |
 
 ### Money & data rules (short version)
 
@@ -395,12 +431,13 @@ docker-entrypoint.sh    runs `prisma migrate deploy`, then the Next.js server
 - Allocations are computed **live** from the current percentages (editing a % re-computes history — by design).
 - `Category.kind` is `"EXPENSE" | "SAVINGS"`; expenses only accept EXPENSE categories, savings entries only SAVINGS ones.
 - Savings balance = Σ deposits − Σ withdrawals across all savings categories, all-time; negative balances are allowed.
+- Everything above is **per account** (D16): users — admins included — only ever see their own categories and entries.
 - Dates are plain calendar days stored as UTC midnights; month filters use UTC ranges and the UI never shifts dates by timezone.
 
 ## Testing
 
 ```bash
-npm test                    # unit tests (money, allocation, dates, categories route guards)
+npm test                    # unit tests (money, allocation, dates, auth; route guards + two-account isolation)
 npm run lint                # ESLint
 npm run build               # type-check + production build
 ```

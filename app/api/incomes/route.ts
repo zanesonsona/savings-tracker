@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseDate, parseMonth } from "@/lib/dates";
 import { toIncomeDTO } from "@/lib/types";
@@ -10,10 +11,13 @@ import {
   zodErrorMessage,
 } from "@/lib/validation";
 
-// GET /api/incomes → IncomeDTO[], newest first; optional ?month=YYYY-MM filter (§7).
+// GET /api/incomes → the session account's IncomeDTO[], newest first; optional ?month= filter (§7).
 export async function GET(request: Request) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   const monthParam = new URL(request.url).searchParams.get("month");
-  const where: Prisma.IncomeWhereInput = {};
+  const where: Prisma.IncomeWhereInput = { userId: auth.user.id };
 
   if (monthParam !== null) {
     const parsed = monthSchema.safeParse(monthParam);
@@ -34,6 +38,9 @@ export async function GET(request: Request) {
 
 // POST /api/incomes → 201 with the created IncomeDTO.
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -54,6 +61,7 @@ export async function POST(request: Request) {
       // Stored as UTC midnight (§7 / D13).
       date: parseDate(date),
       note: emptyToNull(note),
+      userId: auth.user.id,
     },
   });
 

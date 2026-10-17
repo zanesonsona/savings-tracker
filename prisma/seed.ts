@@ -1,13 +1,17 @@
-// DEV-ONLY demo data seeder (T15).
+// DEV-ONLY demo data seeder (T15, updated in T26 for accounts).
 //
-// Wipes all tables and inserts a small demo dataset so the app can be
-// explored without manual entry. The app itself always starts empty (D3) —
-// seeding is opt-in via `npm run db:seed`. Idempotent: run it again to reset.
+// Wipes all tables (users included) and inserts a demo ADMIN account plus a
+// small dataset owned by it, so the app can be explored without manual entry.
+// The app itself always starts empty (D3) — seeding is opt-in via
+// `npm run db:seed`. Idempotent: run it again to reset.
+//
+// Demo login: demo / demo12345 (role ADMIN, status APPROVED)
 //
 // Usage: npm run db:seed
 
 import { PrismaClient } from "@prisma/client";
 import { currentMonth, parseDate, shiftMonth } from "../lib/dates";
+import { hashPassword } from "../lib/auth";
 
 const prisma = new PrismaClient();
 
@@ -23,23 +27,34 @@ async function main() {
   console.log(`Seeding demo data (current month ${month}, previous ${prevMonth})…`);
 
   // Idempotent: start from a clean slate (FK-safe order).
-  await prisma.expense.deleteMany();
   await prisma.savingsEntry.deleteMany();
+  await prisma.expense.deleteMany();
   await prisma.income.deleteMany();
   await prisma.category.deleteMany();
+  await prisma.user.deleteMany();
+
+  // The demo account owns everything below; every row must carry a userId (T26).
+  const demo = await prisma.user.create({
+    data: {
+      username: "demo",
+      passwordHash: await hashPassword("demo12345"),
+      role: "ADMIN",
+      status: "APPROVED",
+    },
+  });
 
   // 35 / 25 / 20 / 20 across the classic buckets.
   const bills = await prisma.category.create({
-    data: { name: "Bills", percentage: 35, kind: "EXPENSE", color: "#ef4444" },
+    data: { name: "Bills", percentage: 35, kind: "EXPENSE", color: "#ef4444", userId: demo.id },
   });
   const needs = await prisma.category.create({
-    data: { name: "Needs", percentage: 25, kind: "EXPENSE", color: "#3b82f6" },
+    data: { name: "Needs", percentage: 25, kind: "EXPENSE", color: "#3b82f6", userId: demo.id },
   });
   const debts = await prisma.category.create({
-    data: { name: "Debts", percentage: 20, kind: "EXPENSE", color: "#f59e0b" },
+    data: { name: "Debts", percentage: 20, kind: "EXPENSE", color: "#f59e0b", userId: demo.id },
   });
   const savings = await prisma.category.create({
-    data: { name: "Savings", percentage: 20, kind: "SAVINGS", color: "#22c55e" },
+    data: { name: "Savings", percentage: 20, kind: "SAVINGS", color: "#22c55e", userId: demo.id },
   });
 
   // 2 incomes (one this month, one last month).
@@ -49,6 +64,7 @@ async function main() {
       source: "Salary",
       date: parseDate(`${month}-01`),
       note: "Monthly salary",
+      userId: demo.id,
     },
   });
   await prisma.income.create({
@@ -57,21 +73,46 @@ async function main() {
       source: "Freelance",
       date: parseDate(`${prevMonth}-15`),
       note: "Side project",
+      userId: demo.id,
     },
   });
 
   // A few expenses (current month + one in the previous month).
   await prisma.expense.create({
-    data: { amountCents: 20000, date: parseDate(`${month}-05`), categoryId: bills.id, note: "Electricity" },
+    data: {
+      amountCents: 20000,
+      date: parseDate(`${month}-05`),
+      categoryId: bills.id,
+      note: "Electricity",
+      userId: demo.id,
+    },
   });
   await prisma.expense.create({
-    data: { amountCents: 8000, date: parseDate(`${month}-08`), categoryId: needs.id, note: "Groceries" },
+    data: {
+      amountCents: 8000,
+      date: parseDate(`${month}-08`),
+      categoryId: needs.id,
+      note: "Groceries",
+      userId: demo.id,
+    },
   });
   await prisma.expense.create({
-    data: { amountCents: 15000, date: parseDate(`${month}-12`), categoryId: debts.id, note: "Loan payment" },
+    data: {
+      amountCents: 15000,
+      date: parseDate(`${month}-12`),
+      categoryId: debts.id,
+      note: "Loan payment",
+      userId: demo.id,
+    },
   });
   await prisma.expense.create({
-    data: { amountCents: 6000, date: parseDate(`${prevMonth}-20`), categoryId: needs.id, note: "Groceries" },
+    data: {
+      amountCents: 6000,
+      date: parseDate(`${prevMonth}-20`),
+      categoryId: needs.id,
+      note: "Groceries",
+      userId: demo.id,
+    },
   });
 
   // 1 savings deposit.
@@ -82,17 +123,19 @@ async function main() {
       date: parseDate(`${month}-02`),
       categoryId: savings.id,
       note: "Emergency fund",
+      userId: demo.id,
     },
   });
 
   const counts = {
+    users: await prisma.user.count(),
     categories: await prisma.category.count(),
     incomes: await prisma.income.count(),
     expenses: await prisma.expense.count(),
     savingsEntries: await prisma.savingsEntry.count(),
   };
   console.log("Seed complete:", counts);
-  console.log("Tip: open / to see the dashboard with allocations for the current month.");
+  console.log("Demo login: demo / demo12345 (admin). Open / to see the dashboard.");
 }
 
 main()

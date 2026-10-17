@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatPercentBp } from "@/lib/money";
 import { toCategoryDTO } from "@/lib/types";
@@ -10,6 +11,9 @@ import {
 
 // PATCH /api/categories/[id] → 200 with the updated CategoryDTO.
 export async function PATCH(request: Request, ctx: RouteContext<"/api/categories/[id]">) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   const { id: rawId } = await ctx.params;
   const id = parseIdParam(rawId);
   if (id === null) {
@@ -29,16 +33,18 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/categories
   }
   const { name, percentage, kind, color } = parsed.data;
 
-  const current = await prisma.category.findUnique({
-    where: { id },
+  // Scoped lookup: another account's id is indistinguishable from a missing one → 404 (D16).
+  const current = await prisma.category.findFirst({
+    where: { id, userId: auth.user.id },
     include: { _count: { select: { expenses: true, savingsEntries: true } } },
   });
   if (!current) {
     return NextResponse.json({ error: "Category not found" }, { status: 404 });
   }
 
+  // Duplicate-name and Σ% guards are per account (D16).
   const others = await prisma.category.findMany({
-    where: { id: { not: id } },
+    where: { userId: auth.user.id, id: { not: id } },
     select: { name: true, percentage: true },
   });
 
@@ -97,14 +103,17 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/categories
 
 // DELETE /api/categories/[id] → 204; 409 when expenses/savings entries exist (D9).
 export async function DELETE(_request: Request, ctx: RouteContext<"/api/categories/[id]">) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   const { id: rawId } = await ctx.params;
   const id = parseIdParam(rawId);
   if (id === null) {
     return NextResponse.json({ error: "Invalid category id" }, { status: 400 });
   }
 
-  const category = await prisma.category.findUnique({
-    where: { id },
+  const category = await prisma.category.findFirst({
+    where: { id, userId: auth.user.id },
     include: { _count: { select: { expenses: true, savingsEntries: true } } },
   });
   if (!category) {

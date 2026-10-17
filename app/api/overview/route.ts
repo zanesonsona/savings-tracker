@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { currentMonth, parseMonth } from "@/lib/dates";
 import { splitIncome } from "@/lib/allocation";
@@ -11,6 +12,9 @@ import type { CategoryKind, OverviewCategoryDTO, OverviewResponse } from "@/lib/
 // actualCents = Σ expenses (EXPENSE) or net deposits (SAVINGS) of the month;
 // progress = actual / allocated (0 when allocated = 0); savings balance = all-time net (D7).
 export async function GET(request: Request) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   const monthParam = new URL(request.url).searchParams.get("month") ?? currentMonth();
 
   const parsed = monthSchema.safeParse(monthParam);
@@ -20,13 +24,15 @@ export async function GET(request: Request) {
   const month = parsed.data;
   const { start, end } = parseMonth(month);
   const range = { gte: start, lt: end };
+  const userId = auth.user.id;
 
+  // Everything below is scoped to the session account (D16).
   const [categories, incomes, expenses, savingsEntries, allTimeRows] = await Promise.all([
-    prisma.category.findMany({ orderBy: { id: "asc" } }),
-    prisma.income.findMany({ where: { date: range } }),
-    prisma.expense.findMany({ where: { date: range } }),
-    prisma.savingsEntry.findMany({ where: { date: range } }),
-    prisma.savingsEntry.groupBy({ by: ["direction"], _sum: { amountCents: true } }),
+    prisma.category.findMany({ where: { userId }, orderBy: { id: "asc" } }),
+    prisma.income.findMany({ where: { userId, date: range } }),
+    prisma.expense.findMany({ where: { userId, date: range } }),
+    prisma.savingsEntry.findMany({ where: { userId, date: range } }),
+    prisma.savingsEntry.groupBy({ by: ["direction"], where: { userId }, _sum: { amountCents: true } }),
   ]);
 
   const incomeTotalCents = incomes.reduce((sum, income) => sum + income.amountCents, 0);

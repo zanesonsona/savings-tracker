@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseDate, parseMonth } from "@/lib/dates";
 import { toExpenseDTO } from "@/lib/types";
@@ -11,13 +12,16 @@ import {
   zodErrorMessage,
 } from "@/lib/validation";
 
-// GET /api/expenses → ExpenseDTO[] (category included), newest first;
+// GET /api/expenses → the session account's ExpenseDTO[] (category included), newest first;
 // optional ?month=YYYY-MM and ?categoryId= filters (they combine).
 export async function GET(request: Request) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   const params = new URL(request.url).searchParams;
   const monthParam = params.get("month");
   const categoryIdParam = params.get("categoryId");
-  const where: Prisma.ExpenseWhereInput = {};
+  const where: Prisma.ExpenseWhereInput = { userId: auth.user.id };
 
   if (monthParam !== null) {
     const parsed = monthSchema.safeParse(monthParam);
@@ -48,6 +52,9 @@ export async function GET(request: Request) {
 // POST /api/expenses → 201 with the created ExpenseDTO.
 // Only kind = "EXPENSE" categories may be used (savings → use savings entries).
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -61,7 +68,8 @@ export async function POST(request: Request) {
   }
   const { amountCents, date, categoryId, note } = parsed.data;
 
-  const category = await prisma.category.findUnique({ where: { id: categoryId } });
+  // Scoped: a category id from another account behaves like a missing one → 404 (D16).
+  const category = await prisma.category.findFirst({ where: { id: categoryId, userId: auth.user.id } });
   if (!category) {
     return NextResponse.json({ error: "Category not found" }, { status: 404 });
   }
@@ -79,6 +87,7 @@ export async function POST(request: Request) {
       date: parseDate(date),
       note: emptyToNull(note),
       categoryId,
+      userId: auth.user.id,
     },
     include: { category: true },
   });
