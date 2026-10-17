@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T17 — Fix BUG-QA-01: enforce strict Σ% ≤ 100 · **Progress:** 16/18 tasks (T01–T16 ✅; T17–T18 queued by QA)
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** — (all tasks ✅; QA re-verification Q7–Q8 pending) · **Progress:** 20/20 tasks (T01–T20 ✅)
 
 ### 1. Vision
 
@@ -59,7 +59,7 @@ Auth/multi-user · bank sync · recurring salary auto-entry · editing past entr
   lib/          (prisma.ts, money.ts, allocation.ts, dates.ts, validation.ts, constants.ts, types.ts)
   prisma/       (schema.prisma, seed.ts, dev.db)
   ```
-- **Commands (exist after T02):** `npm run dev` · `npm run build` · `npm run lint` · `npm test` · `npm run db:migrate` · `npm run db:studio` · `npm run db:seed` (after T15).
+- **Commands (exist after T02):** `npm run dev` · `npm run build` · `npm run lint` · `npm test` · `npm run db:migrate` · `npm run db:studio` · `npm run db:seed` (after T15) · Docker (after T20): `docker build -t savings-tracker .` then `docker run --rm -p 3000:3000 -v savings-data:/app/data savings-tracker`.
 
 ### 5. Data model (target — created in T03)
 
@@ -291,16 +291,32 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Result (2026-10-17):** ✅ acceptance met — gates 22/22 · lint clean · build green; full per-task/per-flow/per-edge matrices, evidence and the defect log in the **Senior QA** section below. **2 defects found → queued as T17/T18** (QA reports; dev fixes).
 
 #### T17 — Fix BUG-QA-01: enforce strict Σ% ≤ 100 in the categories API
-**Status:** ⬜ TODO · **Depends on:** T16 · **Files:** `app/api/categories/route.ts`, `app/api/categories/[id]/route.ts`
+**Status:** ✅ DONE · **Depends on:** T16 · **Files:** `app/api/categories/route.ts`, `app/api/categories/[id]/route.ts`, `app/api/categories/categories-api.test.ts`, `vitest.config.mts`
 - **Defect (from QA):** at Σ = 100.00% a POST of `percentage: 0.01` and a PATCH pushing Σ to 100.01 are both accepted — the guards reject only `sumBp > 10001`. Effect with a 5000.00 income: allocations sum 500050¢ vs income 500000¢ and `unallocatedCents` = **−50** → D5 violation ("total must be ≤ 100"). Repro + evidence in the Senior QA defect log (BUG-QA-01).
 - **Fix:** tighten **both** guards from `sumBp > 10001` to `sumBp > 10000` (Σ = 100.00 stays allowed and split-exact), keeping the current message format `Total allocation cannot exceed 100% (would be X%)`; add a regression test for the 100.01% attempt.
 - **Acceptance criteria:** Σ=100 → POST 0.01 → 400; PATCH to 100.01 → 400; Σ=99.99 → POST 0.01 → 201 (still allowed); `npm test` / lint / build green; QA replay of the repro returns 400 (matrix updated in Senior QA).
+- **Result (2026-10-17):** ✅ both guards tightened to `> 10000` (D5) — commit `5ecab99`. HTTP replay: POST 0.01% at Σ=100 → **400** `Total allocation cannot exceed 100% (would be 100.01%)`; PATCH to Σ=100.01 → **400**; Σ=100.00 exactly still valid (POST/PATCH 201/200); Σ=99.99 + 0.01 → **201**. Regression tests + 30/30 unit tests green; lint/build green.
 
 #### T18 — Fix BUG-QA-02: block category kind changes while entries exist
-**Status:** ⬜ TODO · **Depends on:** T16 · **Files:** `app/api/categories/[id]/route.ts`
+**Status:** ✅ DONE · **Depends on:** T16 · **Files:** `app/api/categories/[id]/route.ts`, `app/api/categories/categories-api.test.ts`
 - **Defect (from QA):** PATCH `{ kind: "SAVINGS" }` on an EXPENSE category holding an expense returns 200; the expense stays attached to the now-SAVINGS-kind category (**breaks D8**) and dashboard `totals.spentCents` silently drops (21000 → 20000) while the row is still in the DB.
 - **Fix:** in PATCH, when `kind` changes, count entries of the **current** kind (`expenses` for EXPENSE→SAVINGS, `savingsEntries` for the reverse) and return **409** if any exist, D9-style (`Cannot change kind: this category has 1 expense(s) — delete them first`; savings variant analogous). Kind change with no entries stays 200.
 - **Acceptance criteria:** kind change with entries → 409 (entries untouched, overview unchanged); kind change with no entries → 200; name/percentage/color edits still work on used categories; `npm test` / lint / build green; QA replay of the repro returns 409.
+- **Result (2026-10-17):** ✅ 409 with the exact D9-style message on the QA repro (expense 200.00 on Bills → `spentCents` stays **20000**); safe kind change (200); name/percentage/color edits on used categories (200); savings-side variant blocked too (deposit → kind change → 409). Commit `5ecab99`.
+
+#### T19 — Switch the display currency from USD to PHP (answers Q1)
+**Status:** ✅ DONE · **Depends on:** T16 · **Files:** `lib/constants.ts`, `lib/money.test.ts`, `lib/allocation.test.ts`, `README.md`
+- User decision (2026-10-17): display **Philippine pesos**. Set `APP_CURRENCY = "PHP"`; keep `APP_LOCALE = "en-US"` (Intl renders identically to `en-PH`: `₱1,234.56`; dates stay as-is — out of scope).
+- No schema/API/UI structural changes: every screen already formats through `formatCents`, so this is the single-constant switch designed in T04. Amounts remain integer cents (centavos, D4).
+- **Acceptance criteria:** money unit tests expect ₱ output; no hardcoded currency symbols elsewhere in `app/`/`components/`/`lib/`; tests/lint/build green.
+- **Result (2026-10-17):** ✅ `formatCents(123456)` → `₱1,234.56`, negative → `-₱8.00`; grep shows no remaining `$`/USD display strings in app code; 30/30 unit tests, lint, build green; `"PHP"` confirmed inside the production client bundle (Docker image). Commit `2940322`.
+
+#### T20 — Docker support (production image + SQLite persistence)
+**Status:** ✅ DONE · **Depends on:** T15 · **Files:** `Dockerfile`, `.dockerignore`, `docker-entrypoint.sh`, `next.config.ts`, `README.md`
+- Three-stage `Dockerfile` on `node:24-bookworm-slim`: **deps** (`npm ci` + isolated Prisma CLI install pinned to the lockfile's exact CLI version) → **builder** (`prisma generate` then `next build` with new `output: "standalone"`) → **runner** (standalone server + `.next/static` + `public` + traced `.prisma` client + `prisma/` schema & migrations + Prisma CLI), runs as the non-root `node` user.
+- `docker-entrypoint.sh`: `prisma migrate deploy` (creates the DB on first boot, upgrades on start), then `node server.js`. `DATABASE_URL="file:/app/data/dev.db"` (absolute → layout-independent); `VOLUME /app/data` keeps the DB across restarts; `.dockerignore` keeps the context (and `dev.db`) out of the image.
+- **Acceptance criteria:** `docker build` succeeds; container starts, migrates, serves the app; fresh volume starts empty (D3); data persists across a restart; T17 guard + PHP active inside the image.
+- **Result (2026-10-17):** ✅ `docker build` OK (~510 MB image); boot log applies migration `20261016160931_init` then `Ready`; `whoami` → `node`; fresh volume → `GET /api/categories` = `[]` (200); 4× POST 201; T17 repro → 400 **in-image**; `/` → 200; `"PHP"` found in built client chunks; `docker restart` with the same volume → data intact. Commit `d0c4b3a`.
 
 ---
 
@@ -342,6 +358,10 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T14 | Full-stack Developer | Dashboard UI: month picker driving `/api/overview`, 4 summary cards (Income/Spent/Net saved/Savings balance), per-category rows (dot+badge, actual of allocated, remaining/over, `ProgressBar` red >100%), onboarding + no-income empty states; boilerplate replaced. 20/20 script checks PASS incl. income/spent/saved/balance/bills reconciliation vs the three page APIs; DB wiped; lint+build green; commit `ea885a3`. |
 | 2026-10-17 | T15 | Full-stack Developer | DEV-ONLY idempotent `prisma/seed.ts` (wipes + 4 categories 35/25/20/20, 2 incomes, 4 expenses, 1 deposit; production guard); full README (setup, optional seed, scripts, architecture, money rules); polish: custom `app/icon.svg` (default favicon removed), `vitest.config.mts` (ESM warning gone), lint clean. 40/40 script checks PASS (fresh-empty → seed → numbers → re-seed idempotency → wipe); lint+build green; commit `2f4add3`. |
 | 2026-10-17 | T16 | Senior QA | E2E verification pass on the T15 revision: `npm test` 22/22 · lint clean · build green; API suite 181/181 PASS (S0 + F1–F8 + E1–E8 + validation/month/negative/delete + X1–X3/X6/X7 extras) with 8 observations; seed 12/12 + idempotent + production guard; real-browser (system Edge headless via playwright-core, run from a temp dir — no repo deps) 54/54 PASS incl. every item previously "Deferred to QA" and the over-budget visuals; **2 defects logged → T17/T18** (BUG-QA-01 Σ=100.01% accepted; BUG-QA-02 kind change silently drops spent). Full matrices + defect log in §Senior QA. DB left empty; dev server stopped. |
+| 2026-10-17 | T17 | Full-stack Developer | Tightened both Σ% guards `> 10001` → `> 10000` (D5; BUG-QA-01). Added 8 route-level regression tests driving the handlers with a fake Prisma (vitest now resolves the `@/*` alias). HTTP replay: 400 `(would be 100.01%)`, boundaries 100.00/99.99 correct. Commit `5ecab99`. |
+| 2026-10-17 | T18 | Full-stack Developer | PATCH now counts the **current** kind's entries on kind change → 409 D9-style (`Cannot change kind: … — delete them first`); safe kind change + name/%/color edits still 200. Replay: `spentCents` unchanged (20000), savings-side variant blocked. Commit `5ecab99`. |
+| 2026-10-17 | T19 | Full-stack Developer | Currency USD → PHP (user decision, answers Q1): `APP_CURRENCY="PHP"` → `₱1,234.56`; only the constant + test expectations changed (T04 one-switch design). Commit `2940322`. |
+| 2026-10-17 | T20 | Full-stack Developer | Docker support: multi-stage standalone image + isolated Prisma CLI stage, entrypoint `migrate deploy → node server.js`, absolute `/app/data/dev.db` + volume; `.dockerignore` + README. `docker build` + `docker run` verified end-to-end (migrate, CRUD, PHP bundle, restart persistence). Commit `d0c4b3a`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -368,10 +388,15 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T16 · Σ = 100.01% judged a **defect against D5** even though T05's literal text said reject `> 100.01` · reason: locked decisions beat ambiguous task text; evidence is the broken money math (allocations 500050¢ > income 500000¢, `unallocatedCents` −50) — a data-integrity break, not rounding tolerance.
 - 2026-10-17 · T16 · Real-browser evidence produced with `playwright-core` + the installed **system Edge (headless)** run from a Windows temp dir; **no repo dependencies added** · reason: keeps D11 (`package.json`/`node_modules`) untouched while still testing the actual UI.
 - 2026-10-17 · T16 · Final QA state per D3: DB wiped to fresh-install (0/0/0/0) and dev server stopped; all QA scripts/reports/screenshots live outside the repo (`AppData\Local\Temp\opencode\qa*`) · reason: clean handoff, no parallel tracking files in the project.
+- 2026-10-17 · T17/T18 · Fixes implemented exactly as QA scoped them (guards `> 10000`; kind-change 409 counting the **current** kind's entries) + **route-level regression tests** (`categories-api.test.ts`) driving `POST`/`PATCH` directly with a fake in-memory Prisma (vitest config now resolves the `@/*` alias) · reason: the bugs are HTTP-boundary behavior; tests stay DB-less/hermetic and `npm test` grew 22 → 30 tests.
+- 2026-10-17 · T19 · **PHP** per user instruction (resolves Q1); locale kept `en-US` (Intl output identical to `en-PH`: `₱1,234.56`) · reason: literally a one-constant switch (T04 design); date formatting untouched (out of scope).
+- 2026-10-17 · T20 · Docker base `node:24-bookworm-slim` + **standalone output** + **isolated Prisma CLI stage** (installs the lockfile's exact CLI version) · reason: the first attempt copying only `node_modules/prisma` + `node_modules/@prisma` failed at container start (`Cannot find module 'effect'` — CLI transitive dep); the isolated install is complete and version-pinned without shipping devDependencies.
+- 2026-10-17 · T20 · DB at **absolute** `file:/app/data/dev.db`, `VOLUME /app/data`, entrypoint runs `migrate deploy` on every start · reason: relative SQLite URLs are resolution-dependent and `prisma/` is not part of the standalone trace; absolute + volume is restart/upgrade safe, and a fresh volume still starts empty (D3).
+- 2026-10-17 · T20 · Docker **engine installed in WSL via apt solely to verify** the image (no Docker existed in this environment); test container/volume/image removed afterwards and host `prisma/dev.db` wiped · reason: end-to-end evidence for the deliverable; same system-install pattern as T01 (Node/git via apt as root); no repo file depends on the local Docker install.
 
 ### 13. Open questions (for the human)
 
-- **Q1 — Currency/display locale:** defaulted to `USD` in `lib/constants.ts` (`APP_CURRENCY`). Tell the PM your preferred currency symbol (e.g., ₱, €) — change is trivial until the Settings page (Later) exists. Until answered, agents proceed with USD.
+- **Q1 — Currency/display locale:** ✅ **Answered 2026-10-17 — PHP.** Implemented in T19: `APP_CURRENCY = "PHP"`, amounts display as `₱1,234.56` (still integer cents under the hood).
 - **Q2 — Recurring salary:** MVP = one entry per paycheck, no auto-repeat. Confirm if you want monthly recurrence as a later feature.
 - **Q3 — Editing entries:** MVP = create + delete only. Confirm if quick edit of past income/expenses is needed soon.
 
@@ -379,7 +404,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 ## Full-stack Developer
 
-> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T15.
+> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T20 (QA defect fixes T17–T18 · PHP currency T19 · Docker T20).
 
 ### T01 — Scaffold Next.js app ✅
 - **Commit:** `ed21810 T01: scaffold Next.js app`
@@ -534,6 +559,35 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Verification evidence:** 40/40 script checks PASS against `npm run dev`: fresh (wiped) DB → `/api/categories` = `[]` and `/` 200 with `<title>Savings Tracker</title>` (app starts empty, D3); `npm run db:seed` exit 0 with summary log → categories exactly `Bills/35/EXPENSE/#ef4444`, `Needs/25/EXPENSE/#3b82f6`, `Debts/20/EXPENSE/#f59e0b`, `Savings/20/SAVINGS/#22c55e`; 1 current-month income, 3 current-month expenses, 1 savings entry with balance 1000.00; dashboard payload matches the demo (Bills 175000/20000/155000, Needs remaining 117000, Debts 85000, Savings remaining 0 & progress 1, spent 43000, net saved 100000, balance 100000); **re-running the seed leaves counts identical (4/2/4/1 → idempotent)**; wipe restores `[]`. `npm test` exit 0, 3 files/22 tests pass, and the `configLoader` warning is **absent** (verified). lint + build exit 0 (`/icon.svg` ○ static).
 - **Acceptance criteria (§8 T15):** ✅ fresh setup following the README renders the onboarding empty state (empty DB + API `[]` + `Loading…` SSR verified here; the rendered onboarding card itself is the QA browser pass) · ✅ `npm run db:seed` produces demo data (values + idempotency verified) · ✅ lint + build green.
 - **Handoff note for QA (T16):** the DB is left **empty** (post-wipe); `npm run db:seed` is available for a quick demo dataset. Remaining unverified-here items are all browser-visual (client-rendered lists/chips/bars, modals, navigation) — see the per-task "Deferred to QA" notes above.
+
+### T17 + T18 — QA defect fixes ✅
+- **Commit:** `5ecab99 T17+T18: fix QA defects — strict Σ% guard + kind-change block + regression tests`
+- **Files:**
+  - `app/api/categories/route.ts` + `app/api/categories/[id]/route.ts` — Σ% guards tightened from `> 10001` to `> 10000` (BUG-QA-01; Σ = 100.00 exactly stays allowed, 100.01 is rejected with the same `(would be X%)` message). PATCH `findUnique` now includes `_count`; when a **kind change** is requested, the count of the *current* kind's entries is checked → **409** `Cannot change kind: this category has N expense(s)/savings entry(ies) — delete them first` (BUG-QA-02; D8/D9-style).
+  - `app/api/categories/categories-api.test.ts` (new) — 8 regression tests that call the real route handlers against a **fake in-memory Prisma**: 0.01% at Σ=100 → 400 (+ exact message); Σ=100.00 boundary valid; 99.99 + 0.01 → 201; PATCH to 100.01 → 400; kind change with entries → 409 (entries untouched); without entries → 200; edits on used categories → 200.
+  - `vitest.config.mts` — resolves the `@/*` alias so tests import app modules exactly as Next does.
+- **Verification evidence:** `npm test` → **30/30** (4 files); `npm run lint` → 0; `npm run build` → 0 (13/13 pages; API routes ƒ Dynamic). HTTP replay against the dev server (24 checks; DB wiped before/after): both exact QA repros PASS — POST 0.01% at Σ=100 → **400** with `Total allocation cannot exceed 100% (would be 100.01%)`; PATCH 25 → 25.01 → **400**; kind change with an expense → **409** and `/api/overview` `spentCents` unchanged at **20000**; savings-side kind change → 409; Σ=99.99 + 0.01 → 201.
+- **Note:** the first replay run flagged the PATCH repro as "FAIL" — that was a bug in **my test script** (patching Needs 25 → 20.01 yields Σ 95.01, which is legitimately allowed), not in the app; corrected to 25 → 25.01 (Σ 100.01) and re-ran → 24/24.
+- **Acceptance criteria (§8 T17/T18):** ✅ all lines met (see Result rows in §8).
+
+### T19 — Currency switched to PHP ✅
+- **Commit:** `2940322 T19: switch display currency to PHP`
+- **Files:** `lib/constants.ts` (`APP_CURRENCY = "PHP"`; `APP_LOCALE` stays `en-US` — Intl renders `₱1,234.56` identically to `en-PH`), `lib/money.test.ts` (expects `₱1,234.56` / `₱0.01` / `₱0.00` / `₱1,000,000.00` / `-₱8.00`), `lib/allocation.test.ts` (comment), `README.md` (money rules).
+- **Design:** no API/schema/component changes needed — every screen formats via `formatCents` (T04), so this is the promised one-constant switch. Amounts remain integer cents (centavos, D4).
+- **Verification evidence:** unit suite green (30/30); Node/Intl spot check `Intl.NumberFormat("en-US",{style:"currency",currency:"PHP"})` → `₱1,234.56` / `-₱8.00`; grep for `$/USD` display strings in `app/`, `components/`, `lib/` → none left; `"PHP"` found in the production client chunks inside the Docker image.
+- **Acceptance criteria (§8 T19):** ✅ ₱ displayed everywhere; tests/lint/build green.
+
+### T20 — Docker support ✅
+- **Commit:** `d0c4b3a T20: docker support (standalone image, migrations on start)`
+- **Files:**
+  - `Dockerfile` — 3 stages on `node:24-bookworm-slim`: **deps** (`npm ci` + isolated Prisma CLI install pinned to the lockfile's exact version) → **builder** (`openssl` + `prisma generate` + `npm run build`; `DATABASE_URL=file:/app/data/dev.db`) → **runner** (standalone server, `.next/static`, `public`, traced `.prisma` client, `prisma/` schema + migrations, Prisma CLI; non-root `node` user; `EXPOSE 3000`; `VOLUME /app/data`).
+  - `docker-entrypoint.sh` — applies pending migrations, then `exec node /app/server.js`.
+  - `.dockerignore` — keeps `node_modules`, `.next`, `*.db`, `.env*`, `.git` and internal docs out of the build context (entrypoint kept!).
+  - `next.config.ts` — added `output: "standalone"`.
+  - `README.md` — "Run with Docker" section (build/run, volume, first-run-empty note).
+- **Verification evidence (real Docker daemon 26.1.5 in WSL):** `docker build` OK (~510 MB image). `docker run` with a named volume: log `Applying database migrations…` → migration `20261016160931_init` applied → `Starting Savings Tracker` → `Ready in 0ms`; `whoami` = `node`; fresh volume → `GET /api/categories` = `[]` HTTP 200 and `/` (dashboard) 200; 4 category POSTs → 201; **T17 repro in-image → 400** with the exact message; `"PHP"` present in built client chunks; `docker restart` with the same volume → the 4 categories still served (persistence). Test container + volume + image removed afterwards; host DB wiped to 0/0/0/0.
+- **Judgment call:** first runtime attempt failed with `Cannot find module 'effect'` (Prisma CLI transitive dep outside `@prisma/*`) → replaced piecemeal copying with the isolated, version-pinned CLI install stage; re-built and re-verified (see decision log).
+- **Acceptance criteria (§8 T20):** ✅ build OK; container migrates + serves; fresh volume empty (D3); data persists across restart; T17 + PHP active in the image.
 
 ---
 
