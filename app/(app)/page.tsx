@@ -76,6 +76,7 @@ export default function DashboardPage() {
         ? "positive"
         : "default";
   const balanceTone = data && data.savingsBalanceCents < 0 ? "negative" : "default";
+  const walletTone = data && data.walletBalanceCents < 0 ? "negative" : "default";
 
   return (
     <div className="space-y-6">
@@ -110,7 +111,7 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <SummaryCard
           label="Income"
           value={data ? formatCents(data.incomeTotalCents) : "—"}
@@ -128,6 +129,12 @@ export default function DashboardPage() {
           label="Net saved"
           value={data ? formatCents(data.totals.netSavedCents) : "—"}
           tone={netSavedTone}
+        />
+        <SummaryCard
+          label="Wallet balance"
+          value={data ? formatCents(data.walletBalanceCents) : "—"}
+          sub="All-time · cash not spent or saved"
+          tone={walletTone}
         />
         <SummaryCard
           label="Savings balance"

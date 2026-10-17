@@ -149,6 +149,17 @@ vi.mock("@/lib/prisma", () => {
         table().push(created);
         return decorate ? decorate(created, args.include) : created;
       }),
+      aggregate: vi.fn(async (args?: Args) => ({
+        _sum: {
+          amountCents: table()
+            .filter((row) => matches(row, args?.where))
+            .reduce(
+              (sum, row) =>
+                sum + ((row as unknown as { amountCents?: number }).amountCents ?? 0),
+              0,
+            ),
+        },
+      })),
       delete: vi.fn(async (args: { where: { id: number } }) => {
         const rows = table();
         const index = rows.findIndex((row) => row.id === args.where.id);
@@ -407,12 +418,14 @@ describe("/api/overview is isolated per account", () => {
     const body = (await res.json()) as {
       incomeTotalCents: number;
       totals: { spentCents: number; netSavedCents: number };
+      walletBalanceCents: number;
       savingsBalanceCents: number;
       categories: { id: number }[];
     };
     expect(body.incomeTotalCents).toBe(10000);
     expect(body.totals.spentCents).toBe(3000);
     expect(body.totals.netSavedCents).toBe(5000);
+    expect(body.walletBalanceCents).toBe(2000); // 10000 − 3000 − 5000 (T28, per account)
     expect(body.savingsBalanceCents).toBe(5000);
     expect(body.categories.map((c) => c.id).sort()).toEqual([11, 12]);
   });
@@ -423,11 +436,13 @@ describe("/api/overview is isolated per account", () => {
     const body = (await res.json()) as {
       incomeTotalCents: number;
       totals: { spentCents: number; netSavedCents: number };
+      walletBalanceCents: number;
       savingsBalanceCents: number;
     };
     expect(body.incomeTotalCents).toBe(20000);
     expect(body.totals.spentCents).toBe(7000);
     expect(body.totals.netSavedCents).toBe(2000);
+    expect(body.walletBalanceCents).toBe(11000); // 20000 − 7000 − 2000
     expect(body.savingsBalanceCents).toBe(2000);
   });
 });

@@ -83,6 +83,8 @@ export interface OverviewResponse {
     spentCents: number;
     netSavedCents: number;
   };
+  /** All-time cash on hand: income − expenses − savings net (D18/T28); may be negative. */
+  walletBalanceCents: number;
   savingsBalanceCents: number;
 }
 

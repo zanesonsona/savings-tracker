@@ -5,6 +5,7 @@ A local web app to plan and track your money: create an account, log your income
 - **Income splitting** — each income is split live across categories with the largest-remainder method, in whole cents (Σ% ≤ 100; the leftover shows as "Unallocated").
 - **Plan vs actual** — dashboard with allocated/actual/remaining per category, progress bars, and over-budget highlighting.
 - **Savings** — deposits/withdrawals on savings-kind categories with an all-time running balance (negative balances are allowed and shown in red).
+- **Wallet balance** — all-time cash on hand (income − spent − savings net) on the dashboard, next to the savings balance.
 - **Accounts with admin approval** — the first account becomes the admin; later registrations wait for approval, and every account only ever sees its own data. One SQLite file, no cloud.
 - **Ships empty by design** — no preset users, categories, or demo data; the first account you register becomes the admin, then you create your own buckets.
 
@@ -44,7 +45,7 @@ The app starts **empty** (no users, no categories, no entries) — the first acc
 3. **Log income** — open `/income`. Enter an amount (e.g. `5000.00`), an optional source, a date, and an optional note. Every income row shows its computed split across your categories (plus an *Unallocated* chip when Σ% < 100%).
 4. **Log expenses** — open `/expenses`. Expenses can only be filed against Expense-kind categories. Filter by month and category; the list and live total follow the active filters.
 5. **Track savings** — open `/savings`. Record deposits and withdrawals against Savings-kind categories. The balance card shows the **all-time** net (red when negative) and the month's net.
-6. **Read the dashboard** — open `/` (Dashboard). Pick a month and compare allocated vs actual per category, with Income / Spent / Net saved summary cards and the all-time savings balance.
+6. **Read the dashboard** — open `/` (Dashboard). Pick a month and compare allocated vs actual per category, with Income / Spent / Net saved / **Wallet balance** summary cards plus the all-time savings balance.
 7. **Fix mistakes by deleting** — entries are **create + delete only** (no editing in the MVP). Deleting an income/expense/savings entry is always allowed; deleting a category is blocked while it still has entries, and changing a category's kind is blocked while entries of its current kind exist. Allocations are recomputed live from the current percentages, so changing a % re-computes the plan for every month.
 
 ## Optional: demo data (DEV ONLY)
@@ -289,6 +290,7 @@ Errors: `404 Category not found` for an unknown `categoryId`; `400 Savings entri
     }
   ],
   "totals": { "spentCents": 20000, "netSavedCents": 100000 },
+  "walletBalanceCents": 380000,
   "savingsBalanceCents": 100000
 }
 ```
@@ -300,6 +302,7 @@ Field semantics:
 - `remainingCents` — `allocatedCents − actualCents`; can go negative.
 - `progress` — `actualCents / allocatedCents`, or `0` when allocated is 0; values `> 1` mean over budget (the UI shows red).
 - `totals.spentCents` — Σ actuals of all expense-kind categories; `totals.netSavedCents` — month net of all savings-kind categories.
+- `walletBalanceCents` — **all-time** cash on hand (D18): all-time income − all-time expenses − savings net (deposits − withdrawals). Withdrawals return cash to the wallet; negative is allowed and shown red; independent of `month`.
 - `savingsBalanceCents` — all-time net across all savings categories (independent of `month`).
 
 ### End-to-end example (curl)

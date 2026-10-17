@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { currentMonth, parseMonth } from "@/lib/dates";
 import { splitIncome } from "@/lib/allocation";
+import { walletBalanceCents } from "@/lib/wallet";
 import { monthSchema, zodErrorMessage } from "@/lib/validation";
 import type { CategoryKind, OverviewCategoryDTO, OverviewResponse } from "@/lib/types";
 
@@ -10,7 +11,8 @@ import type { CategoryKind, OverviewCategoryDTO, OverviewResponse } from "@/lib/
 //
 // allocatedCents = Σ splitIncome over the month's incomes per category (D6: computed live);
 // actualCents = Σ expenses (EXPENSE) or net deposits (SAVINGS) of the month;
-// progress = actual / allocated (0 when allocated = 0); savings balance = all-time net (D7).
+// progress = actual / allocated (0 when allocated = 0); savings balance = all-time net (D7);
+// walletBalanceCents = all-time cash on hand (income − expenses − savings net, D18/T28).
 export async function GET(request: Request) {
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
@@ -26,14 +28,18 @@ export async function GET(request: Request) {
   const range = { gte: start, lt: end };
   const userId = auth.user.id;
 
-  // Everything below is scoped to the session account (D16).
-  const [categories, incomes, expenses, savingsEntries, allTimeRows] = await Promise.all([
-    prisma.category.findMany({ where: { userId }, orderBy: { id: "asc" } }),
-    prisma.income.findMany({ where: { userId, date: range } }),
-    prisma.expense.findMany({ where: { userId, date: range } }),
-    prisma.savingsEntry.findMany({ where: { userId, date: range } }),
-    prisma.savingsEntry.groupBy({ by: ["direction"], where: { userId }, _sum: { amountCents: true } }),
-  ]);
+  // Everything below is scoped to the session account (D16). The last two
+  // aggregates are all-time (the wallet is independent of `month` — T28).
+  const [categories, incomes, expenses, savingsEntries, allTimeRows, allTimeIncome, allTimeExpenses] =
+    await Promise.all([
+      prisma.category.findMany({ where: { userId }, orderBy: { id: "asc" } }),
+      prisma.income.findMany({ where: { userId, date: range } }),
+      prisma.expense.findMany({ where: { userId, date: range } }),
+      prisma.savingsEntry.findMany({ where: { userId, date: range } }),
+      prisma.savingsEntry.groupBy({ by: ["direction"], where: { userId }, _sum: { amountCents: true } }),
+      prisma.income.aggregate({ where: { userId }, _sum: { amountCents: true } }),
+      prisma.expense.aggregate({ where: { userId }, _sum: { amountCents: true } }),
+    ]);
 
   const incomeTotalCents = incomes.reduce((sum, income) => sum + income.amountCents, 0);
 
@@ -97,10 +103,21 @@ export async function GET(request: Request) {
     .filter((row) => row.kind === "SAVINGS")
     .reduce((sum, row) => sum + row.actualCents, 0);
 
-  const savingsBalanceCents = allTimeRows.reduce((net, row) => {
+  let depositSum = 0;
+  let withdrawalSum = 0;
+  for (const row of allTimeRows) {
     const sum = row._sum.amountCents ?? 0;
-    return net + (row.direction === "DEPOSIT" ? sum : -sum);
-  }, 0);
+    if (row.direction === "DEPOSIT") depositSum += sum;
+    else withdrawalSum += sum;
+  }
+  const savingsBalanceCents = depositSum - withdrawalSum;
+
+  const wallet = walletBalanceCents({
+    incomeCents: allTimeIncome._sum.amountCents ?? 0,
+    expenseCents: allTimeExpenses._sum.amountCents ?? 0,
+    depositCents: depositSum,
+    withdrawalCents: withdrawalSum,
+  });
 
   const body: OverviewResponse = {
     month,
@@ -108,6 +125,7 @@ export async function GET(request: Request) {
     unallocatedCents,
     categories: rows,
     totals: { spentCents, netSavedCents },
+    walletBalanceCents: wallet,
     savingsBalanceCents,
   };
   return NextResponse.json(body);
