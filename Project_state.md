@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T16 — QA / end-to-end verification pass · **Progress:** 15/16 tasks
+**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** T17 — Fix BUG-QA-01: enforce strict Σ% ≤ 100 · **Progress:** 16/18 tasks (T01–T16 ✅; T17–T18 queued by QA)
 
 ### 1. Vision
 
@@ -282,12 +282,25 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Acceptance criteria:** fresh setup following the README renders the onboarding empty state; `npm run db:seed` produces demo data; lint + build green.
 
 #### T16 — QA / end-to-end verification pass
-**Status:** ⬜ TODO · **Depends on:** T15 · **Files:** this file (Work Log) + small fixes
+**Status:** ✅ DONE · **Depends on:** T15 · **Files:** this file (Work Log) + small fixes
 - Run all flows in the browser and record results in the Work Log:
   - F1 create categories 35/25/20/20 → saved; F2 income 5000.00 → split 1750/1250/1000/1000; F3 expense 200 on Bills → remaining 1550; F4 deposit 1000 → balance 1000; F5 withdraw 200 → balance 800; F6 edit Bills 35→40 (blocked) then lower Needs to 20 and retry → 40/20/20/20 saved and splits update; F7 navigate to previous month → zeros + empty states; F8 deleting a category with expenses → blocked with message.
 - Edge cases: E1 1-cent income @ 50/30/20 → 1/0/0; E2 Σ<100 shows Unallocated; E3 duplicate category name blocked; E4 negative/zero amounts blocked; E5 1234.56 stores as 123456 cents and displays back correctly; E6 expense on savings category rejected; E7 withdrawal below zero → negative balance shown red; E8 year-boundary month navigation.
 - Fix small bugs found here; if a fix is non-trivial, append a new task block (T17+).
 - **Acceptance criteria:** checklist logged with pass/fail; `npm test`, `npm run lint`, `npm run build` all green; Work Log entry added.
+- **Result (2026-10-17):** ✅ acceptance met — gates 22/22 · lint clean · build green; full per-task/per-flow/per-edge matrices, evidence and the defect log in the **Senior QA** section below. **2 defects found → queued as T17/T18** (QA reports; dev fixes).
+
+#### T17 — Fix BUG-QA-01: enforce strict Σ% ≤ 100 in the categories API
+**Status:** ⬜ TODO · **Depends on:** T16 · **Files:** `app/api/categories/route.ts`, `app/api/categories/[id]/route.ts`
+- **Defect (from QA):** at Σ = 100.00% a POST of `percentage: 0.01` and a PATCH pushing Σ to 100.01 are both accepted — the guards reject only `sumBp > 10001`. Effect with a 5000.00 income: allocations sum 500050¢ vs income 500000¢ and `unallocatedCents` = **−50** → D5 violation ("total must be ≤ 100"). Repro + evidence in the Senior QA defect log (BUG-QA-01).
+- **Fix:** tighten **both** guards from `sumBp > 10001` to `sumBp > 10000` (Σ = 100.00 stays allowed and split-exact), keeping the current message format `Total allocation cannot exceed 100% (would be X%)`; add a regression test for the 100.01% attempt.
+- **Acceptance criteria:** Σ=100 → POST 0.01 → 400; PATCH to 100.01 → 400; Σ=99.99 → POST 0.01 → 201 (still allowed); `npm test` / lint / build green; QA replay of the repro returns 400 (matrix updated in Senior QA).
+
+#### T18 — Fix BUG-QA-02: block category kind changes while entries exist
+**Status:** ⬜ TODO · **Depends on:** T16 · **Files:** `app/api/categories/[id]/route.ts`
+- **Defect (from QA):** PATCH `{ kind: "SAVINGS" }` on an EXPENSE category holding an expense returns 200; the expense stays attached to the now-SAVINGS-kind category (**breaks D8**) and dashboard `totals.spentCents` silently drops (21000 → 20000) while the row is still in the DB.
+- **Fix:** in PATCH, when `kind` changes, count entries of the **current** kind (`expenses` for EXPENSE→SAVINGS, `savingsEntries` for the reverse) and return **409** if any exist, D9-style (`Cannot change kind: this category has 1 expense(s) — delete them first`; savings variant analogous). Kind change with no entries stays 200.
+- **Acceptance criteria:** kind change with entries → 409 (entries untouched, overview unchanged); kind change with no entries → 200; name/percentage/color edits still work on used categories; `npm test` / lint / build green; QA replay of the repro returns 409.
 
 ---
 
@@ -328,6 +341,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T13 | Full-stack Developer | Overview API: month payload `{month, incomeTotalCents, unallocatedCents, categories[allocated/actual/remaining/progress], totals{spent,netSaved}, savingsBalanceCents}`; allocations recomputed live via `splitIncome` (D6), savings actual = month net, balance all-time (D7). 53/53 curl checks PASS (Oct/Sep/Dec-2025/Jan-2026 + zero-category payload + 400s); DB wiped; lint+build green; commit `83c9c7b`. |
 | 2026-10-17 | T14 | Full-stack Developer | Dashboard UI: month picker driving `/api/overview`, 4 summary cards (Income/Spent/Net saved/Savings balance), per-category rows (dot+badge, actual of allocated, remaining/over, `ProgressBar` red >100%), onboarding + no-income empty states; boilerplate replaced. 20/20 script checks PASS incl. income/spent/saved/balance/bills reconciliation vs the three page APIs; DB wiped; lint+build green; commit `ea885a3`. |
 | 2026-10-17 | T15 | Full-stack Developer | DEV-ONLY idempotent `prisma/seed.ts` (wipes + 4 categories 35/25/20/20, 2 incomes, 4 expenses, 1 deposit; production guard); full README (setup, optional seed, scripts, architecture, money rules); polish: custom `app/icon.svg` (default favicon removed), `vitest.config.mts` (ESM warning gone), lint clean. 40/40 script checks PASS (fresh-empty → seed → numbers → re-seed idempotency → wipe); lint+build green; commit `2f4add3`. |
+| 2026-10-17 | T16 | Senior QA | E2E verification pass on the T15 revision: `npm test` 22/22 · lint clean · build green; API suite 181/181 PASS (S0 + F1–F8 + E1–E8 + validation/month/negative/delete + X1–X3/X6/X7 extras) with 8 observations; seed 12/12 + idempotent + production guard; real-browser (system Edge headless via playwright-core, run from a temp dir — no repo deps) 54/54 PASS incl. every item previously "Deferred to QA" and the over-budget visuals; **2 defects logged → T17/T18** (BUG-QA-01 Σ=100.01% accepted; BUG-QA-02 kind change silently drops spent). Full matrices + defect log in §Senior QA. DB left empty; dev server stopped. |
 
 ### 12. Agent decision log (provisional)
 
@@ -350,6 +364,10 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T11 · GET `/api/savings` with **no `?month=`** defaults to the current UTC month (entries + `monthNetCents`); `balanceCents` is always all-time (D7) · reason: keeps the response shape constant for T12 while remaining curl-friendly. POST wrong-kind message: `Savings entries need a SAVINGS-kind category (create one in Categories first)` (§8 T11 "style message").
 - 2026-10-17 · T15 · Replaced the create-next-app `app/favicon.ico` with a custom **`app/icon.svg`** (slate rounded square + green trend line) and renamed `vitest.config.ts` → **`vitest.config.mts`** · reason: own-brand tab icon (title already "Savings Tracker"); the `.mts` extension clears Vite's ESM-in-CJS configLoader warning without touching behavior.
 - 2026-10-17 · T15 · Seed dates are **relative to the run date** (`currentMonth()` / `shiftMonth(-1)`): income day 01 + 3 expenses + 1 deposit this month, income day 15 + 1 expense last month; seed refuses to run when `NODE_ENV=production` · reason: demo data must land in the month the dashboard opens on; the guard keeps the destructive wipe out of production.
+- 2026-10-17 · T16 · QA **reports defects, does not fix them** (user instruction); the two non-trivial findings are queued as T17/T18 with suggested fixes + acceptance criteria for the dev · reason: keeps the QA/dev role split clean; defects are re-verified by QA after the fixes (Q7/Q8).
+- 2026-10-17 · T16 · Σ = 100.01% judged a **defect against D5** even though T05's literal text said reject `> 100.01` · reason: locked decisions beat ambiguous task text; evidence is the broken money math (allocations 500050¢ > income 500000¢, `unallocatedCents` −50) — a data-integrity break, not rounding tolerance.
+- 2026-10-17 · T16 · Real-browser evidence produced with `playwright-core` + the installed **system Edge (headless)** run from a Windows temp dir; **no repo dependencies added** · reason: keeps D11 (`package.json`/`node_modules`) untouched while still testing the actual UI.
+- 2026-10-17 · T16 · Final QA state per D3: DB wiped to fresh-install (0/0/0/0) and dev server stopped; all QA scripts/reports/screenshots live outside the repo (`AppData\Local\Temp\opencode\qa*`) · reason: clean handoff, no parallel tracking files in the project.
 
 ### 13. Open questions (for the human)
 
@@ -516,3 +534,124 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Verification evidence:** 40/40 script checks PASS against `npm run dev`: fresh (wiped) DB → `/api/categories` = `[]` and `/` 200 with `<title>Savings Tracker</title>` (app starts empty, D3); `npm run db:seed` exit 0 with summary log → categories exactly `Bills/35/EXPENSE/#ef4444`, `Needs/25/EXPENSE/#3b82f6`, `Debts/20/EXPENSE/#f59e0b`, `Savings/20/SAVINGS/#22c55e`; 1 current-month income, 3 current-month expenses, 1 savings entry with balance 1000.00; dashboard payload matches the demo (Bills 175000/20000/155000, Needs remaining 117000, Debts 85000, Savings remaining 0 & progress 1, spent 43000, net saved 100000, balance 100000); **re-running the seed leaves counts identical (4/2/4/1 → idempotent)**; wipe restores `[]`. `npm test` exit 0, 3 files/22 tests pass, and the `configLoader` warning is **absent** (verified). lint + build exit 0 (`/icon.svg` ○ static).
 - **Acceptance criteria (§8 T15):** ✅ fresh setup following the README renders the onboarding empty state (empty DB + API `[]` + `Loading…` SSR verified here; the rendered onboarding card itself is the QA browser pass) · ✅ `npm run db:seed` produces demo data (values + idempotency verified) · ✅ lint + build green.
 - **Handoff note for QA (T16):** the DB is left **empty** (post-wipe); `npm run db:seed` is available for a quick demo dataset. Remaining unverified-here items are all browser-visual (client-rendered lists/chips/bars, modals, navigation) — see the per-task "Deferred to QA" notes above.
+
+---
+
+## Senior QA
+
+> Independent verification of the T15-complete revision (last dev commit `2f4add3`) against §8 acceptance criteria and PM decisions D1–D13. **Role boundary:** QA tests and reports only — the defects below are queued for the Full-stack Developer as T17/T18; QA does not fix them. Last updated: 2026-10-17 · QA status: **T16 ✅ DONE** · Open items: Q7–Q8 (re-verification after T17/T18).
+
+### QA task list
+
+| # | QA task | Status |
+|---|---------|--------|
+| Q1 | Verify T01–T15 acceptance criteria (§8) on the built app | ✅ DONE |
+| Q2 | Edge cases for every backlog + §8 T16 flows F1–F8 / E1–E8 | ✅ DONE |
+| Q3 | Gates: `npm test`, `npm run lint`, `npm run build` | ✅ DONE |
+| Q4 | Seed verification: fresh → seed → idempotent re-run → production guard | ✅ DONE |
+| Q5 | Real-browser pass (all "Deferred to QA" items in T06/T08/T10/T12/T14 + T16 UI checks) | ✅ DONE |
+| Q6 | Defect log with repro, evidence, suggested fixes → T17/T18 | ✅ DONE |
+| Q7 | Re-verify BUG-QA-01/BUG-QA-02 repros after T17/T18 (expect 400 / 409) | ⬜ TO-DO |
+| Q8 | Regression after T17/T18: gates + API suite + browser suite, DB wiped after | ⬜ TO-DO |
+
+### Method & environment
+
+- **Revision:** T15-complete worktree; QA made **no source changes** and added **no dependencies** (`package.json` untouched — D11).
+- **Environment:** WSL Debian · Node v24.22.0 · dev server `http://localhost:3000` · Prisma 6.19.3 (`prisma migrate status` → "Database schema is up to date!") · SQLite `prisma/dev.db`.
+- **Tooling (outside the repo, under `C:\Users\sonso\AppData\Local\Temp\opencode\`):** `qa\` = API/lib/seed suites; `qa-web\` = browser suite using `playwright-core` + the installed **system Edge (headless)** — real-browser evidence with zero repo dependencies.
+- **Data state:** every suite starts from and restores the empty DB (D3); final state 0 categories / 0 incomes / 0 expenses / 0 savings entries, dev server stopped.
+
+### Results summary
+
+| Gate | Result |
+|------|--------|
+| `npm test` | ✅ 22/22 (3 files) |
+| `npm run lint` / `npm run build` | ✅ clean / ✅ green |
+| API suite (S0 + F1–F8 + E1–E8 + V/N/M/D + X1–X3/X6/X7) | ✅ 181/181 PASS · 8 observations → 2 defects |
+| Lib checks (allocation, money, dates, invariants) | ✅ all PASS |
+| Seed verification | ✅ 12/12 · idempotent re-run · `NODE_ENV=production` aborts non-zero |
+| Real-browser suite | ✅ 54/54 PASS · console clean except expected 400/409 from negative tests |
+| Over-budget visual spot check | ✅ 3/3 (red bar `bg-red-500`, red label `text-red-600`, width clamped at 100%) |
+
+### T01–T16 acceptance matrix
+
+| Task | Verdict | Notes (independent evidence) |
+|------|---------|------------------------------|
+| T01 | ✅ | build/lint green; `/` + all 4 pages 200 with nav and "Savings Tracker" title |
+| T02 | ✅ | `npx prisma -v` → 6.19.3; migrate status up to date; test/build scripts run |
+| T03 | ✅ | 4 tables exercised end-to-end by the suites; final counts 0/0/0/0 |
+| T04 | ✅ | 22/22 unit tests incl. every §8 T04 case; independent invariant re-check |
+| T05 | ⚠️ | All §8 T05 paths pass, but Σ=100.01 accepted → **BUG-QA-01** (T17) |
+| T06 | ✅ | create/edit/delete, Σ>100 blocked with visible error, confirm dialog, onboarding empty state |
+| T07 | ✅ | month filters + year boundary, UTC-midnight storage, 400/404/204 lifecycle |
+| T08 | ✅ | split chips 1750/1250/1000/1000 exact, no Unallocated chip, delete, month grouping |
+| T09 | ✅ | kind mismatch 400 (exact message), unknown category 404, month+categoryId combine |
+| T10 | ✅ | add/list/delete, filters combine, totals update, empty states, submit disabled without categories |
+| T11 | ✅ | balance math exact, negative balance allowed (D7), all-time vs month distinction |
+| T12 | ✅ | deposit 1000 → withdraw 200 → $800 in UI, signed green/red rows, red negative card, delete |
+| T13 | ✅ | reconciles with the three page APIs; zero-category payload 200; live recompute (D6) |
+| T14 | ✅ | cards reconcile; prev-month zeros + empty state; over-budget red + clamped bar; 4→1 col |
+| T15 | ✅ | fresh install onboarding; seed demo exact + idempotent + prod guard; icon/title present |
+| T16 | ✅ | this pass — checklist logged, gates green, Work Log entry added; defects queued as T17/T18 |
+
+### F1–F8 flows (§8 T16)
+
+| Flow | Verdict | Evidence |
+|------|---------|----------|
+| F1 categories 35/25/20/20 saved | ✅ | B1: 4 rows, Total 100%, Unallocated $0.00, indicator green |
+| F2 income 5000.00 → 1750/1250/1000/1000 | ✅ | B2: chips $1,750.00 / $1,250.00 / $1,000.00 ×2; no Unallocated chip |
+| F3 expense 200 on Bills → remaining 1550 | ✅ | B3+B6: "of $1,750.00" + exact remaining (API 175000/20000/155000) |
+| F4 deposit 1000 → balance 1000 | ✅ | B4: DEPOSIT default, balance card $1,000 (API month-net 100000) |
+| F5 withdraw 200 → balance 800 | ✅ | B5: balance $800; rows signed +green / −red |
+| F6 edit 35→40 blocked, then Needs 20 + retry → 40/20/20/20 | ✅ | B8: blocked error visible at Σ=100%; after retry saved, Total 100%, dashboard recomputed |
+| F7 prev month → zeros + empty states | ✅ | B7: Sep 2026 zeros + empty state; all-time balance $800 unchanged |
+| F8 delete category with expenses → blocked | ✅ | B9: blocked message + confirm dialog; API 409 |
+
+### Edge cases (§8 T16 E1–E8 + QA extras)
+
+| Case | Verdict | Evidence |
+|------|---------|----------|
+| E1 1¢ @ 50/30/20 → 1/0/0 | ✅ | unit + lib checks; API E1; B12 single chip, no Unallocated |
+| E2 Σ<100 shows Unallocated | ✅ | B11: "Total: 80% · Unallocated: 20%" + chip; API 25000¢ |
+| E3 duplicate category name blocked | ✅ | API E3/E3b 409 (case-insensitive + upper); UI error surfaced |
+| E4 negative/zero amounts blocked | ✅ | API E4 (13 checks); B12 inline errors for invalid/negative/zero |
+| E5 1234.56 → 123456¢ round-trip | ✅ | API storage check; B11 displays $1,234.56 back |
+| E6 expense↔savings mismatches rejected | ✅ | API E6/E6b 400 with exact messages; E6c/E6d unknown category 404 |
+| E7 withdrawal below zero → red balance | ✅ | API E7 negative allowed (D7), overview consistent; B10 red styling |
+| E8 year-boundary month navigation | ✅ | API E8 (16 checks: Dec-2025/Jan-2026 isolation, no leaks, balance continuity); month picker prev/next mechanics browser-verified (B7) |
+| X3 % decimals | ✅ | 0.29 accepted, 3-decimal 33.333 rejected, revert OK |
+| X6 expense with no income (allocated 0) | ✅ | remaining negative, progress 0 per spec, no crash |
+| X7 zero-category app | ✅ | full income unallocated, valid payload, no 500 |
+
+### Defect log (for dev — QA does not fix)
+
+#### BUG-QA-01 — Σ% guard allows 100.01% (D5 violation) → **T17**
+- **Severity:** High (money math breaks: allocations exceed income).
+- **Where:** `app/api/categories/route.ts` (POST guard) and `app/api/categories/[id]/route.ts` (PATCH guard).
+- **Repro:** with categories at Σ=100%: `POST /api/categories {"name":"QAOverflow","percentage":0.01}` → **201**; `PATCH /api/categories/<Needs> {"percentage":20.01}` at Σ=100 → **200**. With a 5000.00 income: `GET /api/overview` → `unallocatedCents: -50`, Σ allocations 500050¢ vs income 500000¢.
+- **Expected:** 400 `Total allocation cannot exceed 100% (would be 100.01%)`; `unallocatedCents ≥ 0` always (D5 + §7 invariant).
+- **Root cause:** both guards reject only `sumBp > 10001`; Σ=100.01% (= 10001 bp) slips through.
+- **Suggested fix:** `> 10000` in both guards + a regression test (full spec in T17).
+
+#### BUG-QA-02 — kind change silently drops entries from totals (D8 violation) → **T18**
+- **Severity:** High (data integrity: rows stay attached but accounting silently changes).
+- **Where:** `app/api/categories/[id]/route.ts` (PATCH; no check when `kind` changes).
+- **Repro:** EXPENSE category with one 210.00 expense → overview `totals.spentCents` = 21000. `PATCH {"kind":"SAVINGS"}` → **200**. After: `spentCents` = 20000 (expense gone from spent) and the expense row is still attached to a SAVINGS-kind category (breaks D8).
+- **Expected:** 409 while entries of the current kind exist, D9-style message.
+- **Suggested fix:** count `expenses` / `savingsEntries` on kind change, return 409 if > 0 (full spec in T18).
+
+### Minor observations (non-blocking, not queued)
+
+- **O1** · `lib/use-today.ts` / `lib/use-current-month.ts` module-level cache never refreshes across midnight / month rollover while the tab stays open → the form's default date/month can be stale until reload. Optional later fix: invalidate the store on `visibilitychange`/timer.
+- **O2** · The client local-today default date vs the UTC month filter can disagree near month boundaries (e.g., shortly after local midnight on the 1st while UTC is still the previous month), so a fresh entry can land outside the visible month. Inherent to D13's UTC rule; UX nicety at most.
+
+### Artifacts & how to re-run (all outside the repo, under `C:\Users\sonso\AppData\Local\Temp\opencode\`)
+
+| Artifact | Path / command |
+|----------|----------------|
+| API suite + report | `qa\qa-t16-api.mjs` → `qa\qa-t16-api-report.json` (181 PASS) |
+| Lib checks | `qa\qa-t16-lib.ts` (run with `tsx`) |
+| Seed checks | `qa\qa-t16-seed.mjs` |
+| Browser suite + report + screenshots | `qa-web\qa-t16-browser.mjs` → `qa-web\qa-t16-browser-report.json`, `qa-web\shots\` (dashboard, income-chips, savings-negative, overbudget, …) |
+| Over-budget visual check | `qa-web\qa-t16-overbudget.mjs` |
+| Re-run (WSL) | start `npm run dev` in the repo, then e.g. `node /mnt/c/Users/sonso/AppData/Local/Temp/opencode/qa/qa-t16-api.mjs` (pass `wipe` to reset the DB first); browser suites need the dev server as well |
