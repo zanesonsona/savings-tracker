@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* T31 — class-strategy dark variant: `dark:` utilities react to the `.dark`
+   class that the inline head script (app/layout.tsx) sets before first paint. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
  * T30 — token layer. Every color utility in the UI references these semantic
  * variables (via `@theme inline`), so T31 Night mode only overrides the
@@ -8,6 +12,7 @@
  * keeps Tailwind's native `--spacing` scale (one 0.25rem step).
  */
 :root {
+  color-scheme: light;
   --surface: #ffffff; /* cards, inputs, nav */
   --surface-muted: #f8fafc; /* page background, hovers, neutral chips */
   --ink: #0f172a; /* primary text */
@@ -25,6 +30,33 @@
   --danger: #dc2626;
   --danger-soft: #fef2f2;
   --danger-border: #fecaca;
+}
+
+/*
+ * T31 — Night mode. Only the variables change: every utility references them
+ * through `@theme inline`, so flipping this block restyles the whole app.
+ * The page background is the darkest layer (surface-muted), cards sit one step
+ * up (surface); the accent inverts so primary buttons stay legible.
+ */
+.dark {
+  color-scheme: dark;
+  --surface: #1e293b; /* slate-800 */
+  --surface-muted: #0f172a; /* slate-900 */
+  --ink: #f1f5f9; /* slate-100 */
+  --ink-muted: #94a3b8; /* slate-400 */
+  --line: #334155; /* slate-700 */
+  --accent: #f1f5f9; /* slate-100 */
+  --accent-hover: #cbd5e1; /* slate-300 */
+  --on-accent: #0f172a; /* slate-900 */
+  --success: #6ee7b7; /* emerald-300 */
+  --success-soft: #064e3b; /* emerald-900 */
+  --success-border: #065f46; /* emerald-800 */
+  --warning: #fcd34d; /* amber-300 */
+  --warning-soft: #451a03; /* amber-950 */
+  --warning-border: #78350f; /* amber-900 */
+  --danger: #fca5a5; /* red-300 */
+  --danger-soft: #450a0a; /* red-950 */
+  --danger-border: #7f1d1d; /* red-900 */
 }
 
 @theme inline {

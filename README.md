@@ -6,6 +6,7 @@ A local web app to plan and track your money: create an account, log your income
 - **Plan vs actual** — dashboard with allocated/actual/remaining per category, progress bars, and over-budget highlighting.
 - **Savings** — deposits/withdrawals on savings-kind categories with an all-time running balance (negative balances are allowed and shown in red).
 - **Wallet balance** — all-time cash on hand (income − spent − savings net) on the dashboard, next to the savings balance.
+- **Night mode** — Light / Dark / System switch in the nav (and on the sign-in/register cards), persisted in `localStorage` (`st-theme`) and applied by a tiny inline script before first paint — no flash on reload.
 - **Accounts with admin approval** — the first account becomes the admin; later registrations wait for approval, and every account only ever sees its own data. One SQLite file, no cloud.
 - **Ships empty by design** — no preset users, categories, or demo data; the first account you register becomes the admin, then you create your own buckets.
 
@@ -47,6 +48,7 @@ The app starts **empty** (no users, no categories, no entries) — the first acc
 5. **Track savings** — open `/savings`. Record deposits and withdrawals against Savings-kind categories. The balance card shows the **all-time** net (red when negative) and the month's net; multi-select filters narrow the list and the month's net, while the balance stays account-wide.
 6. **Read the dashboard** — open `/` (Dashboard). Pick a month and compare allocated vs actual per category, with Income / Spent / Net saved / **Wallet balance** summary cards plus the all-time savings balance. Category chips filter the rows below; the cards stay unchanged.
 7. **Fix mistakes by deleting** — entries are **create + delete only** (no editing in the MVP). Deleting an income/expense/savings entry is always allowed; deleting a category is blocked while it still has entries, and changing a category's kind is blocked while entries of its current kind exist. Allocations are recomputed live from the current percentages, so changing a % re-computes the plan for every month.
+8. **Pick a theme** — the nav has a **Light / Dark / System** switch (the default is System, i.e. your OS preference). The choice is saved in `localStorage` under `st-theme` and re-applied before the first paint on every load, so reloads never flash the wrong theme.
 
 ## Optional: demo data (DEV ONLY)
 
@@ -399,6 +401,7 @@ app/
     savings/            GET (?month=&categoryIds= → entries + balance + month net)/POST + DELETE [id]
     overview/           GET (?month=) → dashboard aggregation payload (session account only)
 proxy.ts                cookie-only optimistic redirects for app routes (Next 16 proxy; no DB)
+globals.css             T30/T31 token layer: semantic CSS variables, `.dark` overrides, shared component classes
 lib/
   auth.ts               scrypt password hashing, session token sign/verify, cookie helpers, requireUser/requireAdmin
   constants.ts          APP_CURRENCY / APP_LOCALE (money formatting switches)
@@ -416,6 +419,7 @@ components/
   RegisterForm.tsx      registration form (success states for admin vs pending)
   AdminUsers.tsx        admin approvals UI (pending first, Approve/Reject, member groups)
   CategoryMultiSelect.tsx toggle-chip multi-select for the Expenses/Savings/Dashboard filters (T29)
+  ThemeToggle.tsx       Light/Dark/System switch (localStorage `st-theme`; head script prevents FOUC)
   Nav.tsx               session-aware nav: username, Log out, Admin link (ADMIN only)
   EmptyState.tsx        shared empty-state card
   ProgressBar.tsx       thin progress bar (red over 100%)

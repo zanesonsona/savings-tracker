@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const LINKS = [
   { href: "/", label: "Dashboard" },
@@ -61,6 +62,7 @@ export default function Nav({ user }: { user: NavUser }) {
           })}
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <ThemeToggle />
           <span className="text-sm text-ink-muted">{user.username}</span>
           <button
             type="button"
