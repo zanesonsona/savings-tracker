@@ -6,11 +6,11 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v1 · **Next up:** — (all tasks ✅; QA re-verification Q7–Q8 pending) · **Progress:** 20/20 tasks (T01–T20 ✅)
+**Last updated:** 2026-10-17 · **Plan version:** PM v2 (Phase 2 added) · **Next up:** T21 — Auth data model + migration (User + per-account ownership) · **Progress:** Phase 1: 20/20 ✅ (T01–T20) · Phase 2: 0/12 ⬜ (T21–T32)
 
 ### 1. Vision
 
-A local, single-user web app to track income, expenses, and savings. The user enters their income/salary; the app automatically splits each income across the user's **own custom categories** (e.g., Bills, Needs, Debts, Savings) based on percentages the user defines. The user then logs real expenses and savings deposits/withdrawals, and sees plan-vs-actual per category plus a running savings balance — all in one clean dashboard.
+A local, single-user web app to track income, expenses, and savings. The user enters their income/salary; the app automatically splits each income across the user's **own custom categories** (e.g., Bills, Needs, Debts, Savings) based on percentages the user defines. The user then logs real expenses and savings deposits/withdrawals, and sees plan-vs-actual per category plus a running savings balance — all in one clean dashboard. **Phase 2 (added 2026-10-17):** the app becomes multi-account — anyone can register, but signing in requires **Admin approval**, and every account keeps its **own clean record** (categories, income, expenses, savings). Phase 2 also adds an all-time **Wallet balance** (cash not spent or saved), **multi-select category filters** on each tab, a UI polish pass and a **Night mode**.
 
 ### 2. MVP scope
 
@@ -23,14 +23,27 @@ A local, single-user web app to track income, expenses, and savings. The user en
 - Clean empty states that guide first-time setup.
 
 **Out of scope (Later backlog — do NOT build now)**
-Auth/multi-user · bank sync · recurring salary auto-entry · editing past entries (create + delete only in MVP) · allocation versioning per income · charts/trends beyond the month view · CSV export · settings page · dark mode · mobile app/PWA.
+Bank sync · recurring salary auto-entry · editing past entries (create + delete only) · allocation versioning per income · charts/trends beyond the month view · CSV export · settings page · mobile app/PWA.
+*(PM v1 listed auth/multi-user and dark mode here too — both moved into Phase 2, see §8 T21–T31.)*
+
+**Phase 2 scope (approved 2026-10-17 — backlog in §8, tasks T21–T32)**
+
+*In scope*
+- Local accounts + **login page**: username + password; registration requires **Admin approval** before first sign-in (D14); the **first-ever sign-up becomes the Admin** (D15).
+- **Per-account data:** each account gets its own categories, income, expenses, savings and balances; the Admin approves accounts and **never sees others' financial records** (D16).
+- **Overall Wallet balance** — all-time cash on hand: income − expenses − savings net (D18).
+- **Multi-select category filters** on the Expenses, Savings and Dashboard tabs (D19).
+- **UI polish pass** + **Night mode** with a persisted toggle (D20).
+
+*Out of scope (Phase 2)*
+- Email verification/notifications, OAuth/social login, password reset/change, account deletion/deactivation, admin-set passwords, shared/household data, multi-device sync, charts, CSV export, PWA.
 
 ### 3. Locked decisions
 
 | # | Decision | Source |
 |---|----------|--------|
 | D1 | Stack: Next.js (App Router) + TypeScript + Tailwind, SQLite via Prisma | user-confirmed |
-| D2 | Single user, local app, **no auth** | user-confirmed |
+| D2 | ~~Single user, local app, no auth~~ **SUPERSEDED 2026-10-17** — multi-account app with admin-approved registration; still local (SQLite) | user-confirmed (Phase 2 request) |
 | D3 | **Fully custom categories, no presets** — fresh install starts with zero categories | user-confirmed |
 | D4 | All money stored/transferred as **integer cents** (`amountCents: Int`); never floats | PM |
 | D5 | Percentages: `Float`, 0–100, max 2 decimals. Total must be **≤ 100**. Less than 100 is allowed and shown as "Unallocated". | PM |
@@ -42,6 +55,14 @@ Auth/multi-user · bank sync · recurring salary auto-entry · editing past entr
 | D11 | Minimal dependencies. Allowed runtime deps: `next`, `react`, `@prisma/client`, `zod`, `lucide-react` (icons, optional). Dev: `prisma`, `vitest`, `tsx`. Anything else needs PM approval (add to §13). | PM |
 | D12 | Git: `git init` in T01, one commit per completed task (`T05: categories API`). Recommended, not mandatory. | PM |
 | D13 | Dates are calendar dates stored as UTC-midnight `DateTime`; month filters use `Date.UTC(y, m-1, 1)` ranges. UI never shifts dates by timezone. | PM |
+| D14 | **Accounts & approval:** local **username + password** accounts (no email). Register → `status=PENDING`; sign-in allowed only after an **ADMIN approves** (`APPROVED`); `REJECTED` accounts cannot sign in. Roles `"ADMIN" \| "USER"`, statuses `"PENDING" \| "APPROVED" \| "REJECTED"` (String columns — SQLite). Usernames unique case-insensitively, 3–30 chars (`A–Z a–z 0–9 . _ -`); passwords ≥ 8 chars. | user-confirmed (Phase 2 request) |
+| D15 | **Admin bootstrap:** the **first-ever registered account** becomes `ADMIN` and is auto-approved; every later registration is `USER` + `PENDING`. No seeded users; a fresh install still starts empty (D3). | user-confirmed 2026-10-17 |
+| D16 | **Everything is per account:** categories, income, expenses, savings entries and all balances belong to exactly one account; every query is scoped to the session account. Category names are unique **per account** (composite unique — not global). The Admin approves accounts only and **never sees other accounts' financial data**. | user-confirmed 2026-10-17 |
+| D17 | **Auth mechanics:** no new dependencies (D11 stands) — passwords hashed with Node's built-in `crypto.scrypt` (salted, timing-safe verify); sessions are HMAC-SHA256-signed httpOnly cookies (`st_session`, 30 days, `SameSite=Lax`, `Secure` in production) signed with `SESSION_SECRET` (production fails fast if unset; dev uses a fixed dev-only fallback with a console warning). All `/api` data endpoints require a session (401); `/api/admin/**` requires `role=ADMIN` (403 otherwise). | PM |
+| D18 | **Wallet balance = cash on hand:** all-time `income − expenses − savings net (deposits − withdrawals)` per account; may be negative (shown red); computed live, never stored. The Savings balance card continues to show money set aside; Wallet shows what's left in hand. | user-confirmed 2026-10-17 |
+| D19 | **Category filters:** **multi-select, flat** categories (tick several at once, OR-combined; e.g. Needs + Wants together) on Expenses, Savings and Dashboard. No category-group model. Filters affect the visible list + list totals; all-time balances (savings) stay account-wide. | user-confirmed 2026-10-17 |
+| D20 | **UI refresh + Night mode:** light / dark / **system** theme, toggle persisted (`localStorage`), no flash-of-wrong-theme; a token layer (CSS variables) added in T30 so T31 flips one palette. Supersedes the T06 “light theme only” note. | user-confirmed (Phase 2 request) |
+| D21 | **Legacy single-user dev data:** rows that predate accounts (dev DBs only — the current DB is empty) are claimed by the **first Admin** created after the upgrade; if implementation makes that unsafe, reset + document the reset instead. | PM |
 
 ### 4. Stack & conventions
 
@@ -49,14 +70,17 @@ Auth/multi-user · bank sync · recurring salary auto-entry · editing past entr
 - **DB:** SQLite file (`prisma/dev.db`), accessed via Prisma. Prisma Client singleton in `lib/prisma.ts`.
 - **Validation:** `zod` in every API route before touching the DB.
 - **API style:** Route handlers under `app/api/**` (JSON). Server components by default; `"use client"` only for interactive parts. No global state library — plain React state + `fetch`; after mutations, refetch or `router.refresh()`.
+- **Auth (Phase 2):** local accounts only; no auth packages (D11 stays) — `node:crypto` scrypt password hashes + HMAC-signed httpOnly session cookie (D17). Every data endpoint reads the session and scopes its queries to that account; admin endpoints check `role === "ADMIN"`. UI routes redirect to `/login` when signed out (the exact guard mechanism — middleware vs per-layout — must follow the bundled Next docs; see T25/AGENTS.md).
 - **Note:** Prisma + SQLite does **not support enums** — `kind`/`direction` are `String` columns validated by zod (`"EXPENSE" | "SAVINGS"`, `"DEPOSIT" | "WITHDRAWAL"`).
 - **Planned layout:**
   ```
   app/page.tsx                 (Dashboard)
   app/income/page.tsx  app/expenses/page.tsx  app/savings/page.tsx  app/categories/page.tsx
+  app/login/page.tsx  app/register/page.tsx  app/admin/users/page.tsx      ← Phase 2 (T24/T27)
   app/api/{categories,incomes,expenses,savings,overview}/route.ts (+ [id]/route.ts)
-  components/   (Nav, forms, lists, MonthPicker, CategoryCard, ProgressBar…)
-  lib/          (prisma.ts, money.ts, allocation.ts, dates.ts, validation.ts, constants.ts, types.ts)
+  app/api/auth/{register,login,logout,me}/route.ts  app/api/admin/users/…  ← Phase 2 (T23/T27)
+  components/   (Nav, forms, lists, MonthPicker, CategoryCard, ProgressBar…, ThemeToggle ← Phase 2)
+  lib/          (prisma.ts, money.ts, allocation.ts, dates.ts, validation.ts, constants.ts, types.ts, auth.ts ← Phase 2)
   prisma/       (schema.prisma, seed.ts, dev.db)
   ```
 - **Commands (exist after T02):** `npm run dev` · `npm run build` · `npm run lint` · `npm test` · `npm run db:migrate` · `npm run db:studio` · `npm run db:seed` (after T15) · Docker (after T20): `docker build -t savings-tracker .` then `docker run --rm -p 3000:3000 -v savings-data:/app/data savings-tracker`.
@@ -111,9 +135,31 @@ model SavingsEntry {
 }
 ```
 
+**Phase 2 additions (T21 — created when T21 lands):**
+
+```prisma
+model User {
+  id             Int            @id @default(autoincrement())
+  username       String         @unique               // compared case-insensitively in the API
+  passwordHash   String                               // scrypt (Node crypto) — D17
+  role           String         @default("USER")      // "ADMIN" | "USER"
+  status         String         @default("PENDING")   // "PENDING" | "APPROVED" | "REJECTED"
+  createdAt      DateTime       @default(now())
+  decidedAt      DateTime?
+  categories     Category[]
+  incomes        Income[]
+  expenses       Expense[]
+  savingsEntries SavingsEntry[]
+}
+
+// Category, Income, Expense, SavingsEntry each gain:
+//   userId Int  +  user User @relation(fields: [userId], references: [id], onDelete: Cascade)  +  @@index([userId])
+// Category.name: global @unique → @@unique([userId, name])   (per-account names — D16)
+```
+
 ### 6. API contract (target)
 
-Error shape everywhere: `{ "error": "<human-readable message>" }` with 400 (validation), 404 (missing), 409 (conflict). Success: raw JSON object/array (201 on create, 204 on delete).
+Error shape everywhere: `{ "error": "<human-readable message>" }` with 400 (validation), 404 (missing), 409 (conflict); Phase 2 adds 401 (signed out) and 403 (not allowed). Success: raw JSON object/array (201 on create, 204 on delete).
 
 | Endpoint | Methods | Notes |
 |---|---|---|
@@ -125,7 +171,20 @@ Error shape everywhere: `{ "error": "<human-readable message>" }` with 400 (vali
 | `/api/expenses/[id]` | DELETE | |
 | `/api/savings` | GET, POST | GET `?month=` returns `{ entries, balanceCents, monthNetCents }`; POST rejects non-SAVINGS categories |
 | `/api/savings/[id]` | DELETE | |
-| `/api/overview` | GET | `?month=YYYY-MM` → full dashboard payload (shape fixed in T13) |
+| `/api/overview` | GET | `?month=YYYY-MM` → full dashboard payload (shape fixed in T13; Phase 2 adds `walletBalanceCents` — T28) |
+
+**Auth & admin endpoints (Phase 2 — added by T23/T27):**
+
+| Endpoint | Methods | Notes |
+|---|---|---|
+| `/api/auth/register` | POST | `{ username, password }` → 201 `PENDING` account awaiting approval; the **first-ever account** → `ADMIN` + `APPROVED` (D15) |
+| `/api/auth/login` | POST | `APPROVED` accounts only → 200 + session cookie; 401 bad credentials; **403 while `PENDING`** (`Account pending admin approval`); 403 when `REJECTED` |
+| `/api/auth/logout` | POST | clears the session cookie (204) |
+| `/api/auth/me` | GET | the session user, or 401 |
+| `/api/admin/users` | GET | **ADMIN only**; list accounts (`?status=PENDING\|APPROVED\|REJECTED\|ALL`); never returns password hashes |
+| `/api/admin/users/[id]/approve` · `/reject` | POST | **ADMIN only**; `PENDING` → `APPROVED`/`REJECTED` (409 if already decided); an admin cannot decide their own account |
+
+**Phase 2 change for every data endpoint above:** a session is required (**401** `Authentication required` when signed out) and all reads/writes are scoped to the session account (D16) — another account's ids return **404**, and category names are unique per account.
 
 ### 7. Business rules (math)
 
@@ -147,12 +206,20 @@ Invariant: `Σ allocations + unallocatedCents == amountCents`, always.
 - Savings balance (all-time) = Σ deposits − Σ withdrawals across ALL savings categories. A negative balance is allowed server-side; UI shows it in red.
 - Month filter: `start = Date.UTC(y, m-1, 1)`, `end = start + 1 month`; query `date >= start AND date < end`.
 
+**Phase 2 rules**
+
+- **Wallet balance (T28, D18):** per account, all-time `walletBalanceCents = Σ income − Σ expenses − (Σ deposits − Σ withdrawals)` — cash on hand; may be negative (shown red); never stored, computed live from the current rows like every other balance.
+- **Approval gate (T23):** register → `PENDING` (sign-in blocked, login → 403). Admin approves → `APPROVED` (sign-in works). Rejected → `REJECTED` (login → 403). Deciding is admin-only; an admin cannot decide their own account; an `ADMIN` can never be rejected via the API.
+- **Sessions (T22):** signed cookie `st_session` (HMAC-SHA256 over `{ uid, exp }`, secret `SESSION_SECRET`, 30-day expiry, httpOnly, `SameSite=Lax`, `Secure` in production). Expired / tampered / unknown-user sessions are treated as signed out: 401 on APIs, redirect to `/login` on pages.
+- **Category filters (T29, D19):** multi-select, OR-combined — `?categoryIds=1,2,3`. Expenses: list + live total follow the selection. Savings: list follows it and `monthNetCents` is computed over the selected categories; all-time `balanceCents` stays account-wide. Dashboard: rows filter client-side; summary cards stay account-wide.
+
 ### 8. Backlog
 
 Status legend: ⬜ TODO · 🔄 IN PROGRESS · ✅ DONE · ⛔ BLOCKED
 Rule: never start a task whose dependencies are not ✅. If a task turns out bigger than expected, split it into `Txx-a` / `Txx-b` blocks here instead of doing everything at once.
 
-**Phases:** P0 Setup (T01–T03) · P1 Utilities (T04) · P2 Categories (T05–T06) · P3 Income (T07–T08) · P4 Expenses (T09–T10) · P5 Savings (T11–T12) · P6 Dashboard (T13–T14) · P7 Hardening (T15–T16)
+**Phases:** *Phase 1 (MVP — ✅ T01–T20):* P0 Setup (T01–T03) · P1 Utilities (T04) · P2 Categories (T05–T06) · P3 Income (T07–T08) · P4 Expenses (T09–T10) · P5 Savings (T11–T12) · P6 Dashboard (T13–T14) · P7 Hardening (T15–T16 + defect fixes T17–T18 · PHP T19 · Docker T20)
+**Phases — Phase 2 (⬜ T21–T32):** P8 Accounts & auth (T21–T27) · P9 Wallet balance (T28) · P10 Category filters (T29) · P11 UI polish & Night mode (T30–T31) · P12 Phase 2 QA (T32)
 
 ---
 
@@ -295,28 +362,124 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Defect (from QA):** at Σ = 100.00% a POST of `percentage: 0.01` and a PATCH pushing Σ to 100.01 are both accepted — the guards reject only `sumBp > 10001`. Effect with a 5000.00 income: allocations sum 500050¢ vs income 500000¢ and `unallocatedCents` = **−50** → D5 violation ("total must be ≤ 100"). Repro + evidence in the Senior QA defect log (BUG-QA-01).
 - **Fix:** tighten **both** guards from `sumBp > 10001` to `sumBp > 10000` (Σ = 100.00 stays allowed and split-exact), keeping the current message format `Total allocation cannot exceed 100% (would be X%)`; add a regression test for the 100.01% attempt.
 - **Acceptance criteria:** Σ=100 → POST 0.01 → 400; PATCH to 100.01 → 400; Σ=99.99 → POST 0.01 → 201 (still allowed); `npm test` / lint / build green; QA replay of the repro returns 400 (matrix updated in Senior QA).
-- **Result (2026-10-17):** ✅ both guards tightened to `> 10000` (D5) — commit `5ecab99`. HTTP replay: POST 0.01% at Σ=100 → **400** `Total allocation cannot exceed 100% (would be 100.01%)`; PATCH to Σ=100.01 → **400**; Σ=100.00 exactly still valid (POST/PATCH 201/200); Σ=99.99 + 0.01 → **201**. Regression tests + 30/30 unit tests green; lint/build green.
+- **Result (2026-10-17):** ✅ both guards tightened to `> 10000` (D5) — commit `5ecab99`. HTTP replay: POST 0.01% at Σ=100 → **400** `Total allocation cannot exceed 100% (would be 100.01%)`; PATCH to Σ=100.01 → **400**; Σ=100.00 exactly still valid (POST/PATCH 201/200); Σ=99.99 + 0.01 → **201**. Regression tests + 30/30 unit tests green; lint/build green. **QA re-verified 2026-10-17:** exact repros return 400 in the independent replay; guarded by `X2.*` assertions — BUG-QA-01 closed (see §Senior QA).
 
 #### T18 — Fix BUG-QA-02: block category kind changes while entries exist
 **Status:** ✅ DONE · **Depends on:** T16 · **Files:** `app/api/categories/[id]/route.ts`, `app/api/categories/categories-api.test.ts`
 - **Defect (from QA):** PATCH `{ kind: "SAVINGS" }` on an EXPENSE category holding an expense returns 200; the expense stays attached to the now-SAVINGS-kind category (**breaks D8**) and dashboard `totals.spentCents` silently drops (21000 → 20000) while the row is still in the DB.
 - **Fix:** in PATCH, when `kind` changes, count entries of the **current** kind (`expenses` for EXPENSE→SAVINGS, `savingsEntries` for the reverse) and return **409** if any exist, D9-style (`Cannot change kind: this category has 1 expense(s) — delete them first`; savings variant analogous). Kind change with no entries stays 200.
 - **Acceptance criteria:** kind change with entries → 409 (entries untouched, overview unchanged); kind change with no entries → 200; name/percentage/color edits still work on used categories; `npm test` / lint / build green; QA replay of the repro returns 409.
-- **Result (2026-10-17):** ✅ 409 with the exact D9-style message on the QA repro (expense 200.00 on Bills → `spentCents` stays **20000**); safe kind change (200); name/percentage/color edits on used categories (200); savings-side variant blocked too (deposit → kind change → 409). Commit `5ecab99`.
+- **Result (2026-10-17):** ✅ 409 with the exact D9-style message on the QA repro (expense 200.00 on Bills → `spentCents` stays **20000**); safe kind change (200); name/percentage/color edits on used categories (200); savings-side variant blocked too (deposit → kind change → 409). Commit `5ecab99`. **QA re-verified 2026-10-17:** repro → 409, totals unchanged; guarded by `X1.*` assertions — BUG-QA-02 closed (see §Senior QA).
 
 #### T19 — Switch the display currency from USD to PHP (answers Q1)
 **Status:** ✅ DONE · **Depends on:** T16 · **Files:** `lib/constants.ts`, `lib/money.test.ts`, `lib/allocation.test.ts`, `README.md`
 - User decision (2026-10-17): display **Philippine pesos**. Set `APP_CURRENCY = "PHP"`; keep `APP_LOCALE = "en-US"` (Intl renders identically to `en-PH`: `₱1,234.56`; dates stay as-is — out of scope).
 - No schema/API/UI structural changes: every screen already formats through `formatCents`, so this is the single-constant switch designed in T04. Amounts remain integer cents (centavos, D4).
 - **Acceptance criteria:** money unit tests expect ₱ output; no hardcoded currency symbols elsewhere in `app/`/`components/`/`lib/`; tests/lint/build green.
-- **Result (2026-10-17):** ✅ `formatCents(123456)` → `₱1,234.56`, negative → `-₱8.00`; grep shows no remaining `$`/USD display strings in app code; 30/30 unit tests, lint, build green; `"PHP"` confirmed inside the production client bundle (Docker image). Commit `2940322`.
+- **Result (2026-10-17):** ✅ `formatCents(123456)` → `₱1,234.56`, negative → `-₱8.00`; grep shows no remaining `$`/USD display strings in app code; 30/30 unit tests, lint, build green; `"PHP"` confirmed inside the production client bundle (Docker image). Commit `2940322`. **QA re-verified 2026-10-17:** ₱ across the full browser suite on the dev server and the image; source scan clean.
 
 #### T20 — Docker support (production image + SQLite persistence)
 **Status:** ✅ DONE · **Depends on:** T15 · **Files:** `Dockerfile`, `.dockerignore`, `docker-entrypoint.sh`, `next.config.ts`, `README.md`
 - Three-stage `Dockerfile` on `node:24-bookworm-slim`: **deps** (`npm ci` + isolated Prisma CLI install pinned to the lockfile's exact CLI version) → **builder** (`prisma generate` then `next build` with new `output: "standalone"`) → **runner** (standalone server + `.next/static` + `public` + traced `.prisma` client + `prisma/` schema & migrations + Prisma CLI), runs as the non-root `node` user.
 - `docker-entrypoint.sh`: `prisma migrate deploy` (creates the DB on first boot, upgrades on start), then `node server.js`. `DATABASE_URL="file:/app/data/dev.db"` (absolute → layout-independent); `VOLUME /app/data` keeps the DB across restarts; `.dockerignore` keeps the context (and `dev.db`) out of the image.
 - **Acceptance criteria:** `docker build` succeeds; container starts, migrates, serves the app; fresh volume starts empty (D3); data persists across a restart; T17 guard + PHP active inside the image.
-- **Result (2026-10-17):** ✅ `docker build` OK (~510 MB image); boot log applies migration `20261016160931_init` then `Ready`; `whoami` → `node`; fresh volume → `GET /api/categories` = `[]` (200); 4× POST 201; T17 repro → 400 **in-image**; `/` → 200; `"PHP"` found in built client chunks; `docker restart` with the same volume → data intact. Commit `d0c4b3a`.
+- **Result (2026-10-17):** ✅ `docker build` OK (~510 MB image); boot log applies migration `20261016160931_init` then `Ready`; `whoami` → `node`; fresh volume → `GET /api/categories` = `[]` (200); 4× POST 201; T17 repro → 400 **in-image**; `/` → 200; `"PHP"` found in built client chunks; `docker restart` with the same volume → data intact. Commit `d0c4b3a`. **QA re-verified 2026-10-17:** image rebuilt independently; fresh-volume in-container checks 15/15 incl. T17/T18 guards; full browser suite 54/54 against the container; restart persistence confirmed (details in §Senior QA).
+
+---
+
+### Phase 2 backlog — Accounts, Wallet, Filters & UX (T21–T32)
+
+> **Planned:** 2026-10-17 (PM v2; decisions D14–D21 confirmed with the user the same day). **Phase 1 is complete (T01–T20 ✅); Phase 2 is NOT started — begin with T21.** Same rule as above: never start a task whose dependencies are not ✅.
+
+#### T21 — Auth data model + migration (User + per-account ownership)
+**Status:** ⬜ TODO · **Depends on:** T20 ✅ · **Files:** `prisma/schema.prisma`, `prisma/migrations/*`
+- Add the `User` model and the `userId` relations/indexes exactly as in §5's Phase-2 additions; `Category.name` changes from global `@unique` to `@@unique([userId, name])` (D16); `role`/`status` stay `String` columns validated by zod (SQLite — no enums, §4).
+- `npx prisma migrate dev --name phase2_accounts`; client regenerated; `npm run db:studio` shows 5 tables; the app still boots clean on an empty DB (0 users — D3/D15).
+- **Legacy dev data (D21):** the DB is empty today (QA left 0/0/0/0), so this is a no-op in practice. If a dev DB does hold rows, do **not** silently hand-edit: implement a safe sequence (e.g. nullable column → the first Admin claims those rows at bootstrap → tighten) and record the actual approach in §12.
+- **Acceptance criteria:** migration applies cleanly on the current DB; build/lint green; a fresh start has no user rows.
+
+#### T22 — Auth core library (scrypt hashes + signed sessions) with unit tests
+**Status:** ⬜ TODO · **Depends on:** T21 · **Files:** `lib/auth.ts`, `lib/auth.test.ts`, `.env.example`, `README.md`
+- `hashPassword` / `verifyPassword` with Node's built-in `crypto.scrypt` — random per-account salt, timing-safe compare, encoded format (e.g. `scrypt$<salt>$<hash>`). **No new npm deps** (D11/D17).
+- Session helpers: `createSessionToken(userId)` / `verifySessionToken(token)` — base64url JSON `{ uid, exp }` + HMAC-SHA256 with `SESSION_SECRET`; `setSessionCookie` / `clearSessionCookie` (httpOnly, `SameSite=Lax`, path `/`; `Secure` in production; 30-day expiry).
+- `SESSION_SECRET`: add to `.env.example` + the README configuration table; **production with no secret fails fast**; development falls back to a fixed dev-only secret with a console warning. Docker README note: pass `-e SESSION_SECRET=…`.
+- Tests: hash ≠ password; verify true/false; the same password produces different hashes (salted); token round-trip; tampered, expired, wrong-secret and malformed tokens rejected.
+- **Acceptance criteria:** `npm test` green including the new file; lint/build green.
+
+#### T23 — Auth API (register / login / logout / me) + admin bootstrap
+**Status:** ⬜ TODO · **Depends on:** T21, T22 · **Files:** `app/api/auth/{register,login,logout,me}/route.ts`, `lib/validation.ts`, `lib/types.ts`, `lib/auth.ts`
+- `POST /api/auth/register` — `{ username, password }`: username trimmed 3–30 (`A–Z a–z 0–9 . _ -`), unique case-insensitively → 409 `Username "X" is already taken`; password ≥ 8 chars (400 otherwise). Creates `USER`+`PENDING` → 201 `{ user, message }` — **except the first-ever account: `ADMIN`+`APPROVED`** (D15; also claims legacy rows if any per T21/D21), with a distinct message. No auto-login either way.
+- `POST /api/auth/login` — 401 `Invalid username or password` (identical message for unknown user vs wrong password); **403 `Account pending admin approval`** for `PENDING`; **403 `This account registration was declined`** for `REJECTED`; on success set the session cookie → 200 `{ user }`.
+- `POST /api/auth/logout` → clears the cookie, 204. `GET /api/auth/me` → the session user re-read from the DB (incl. `role`/`status`), or 401.
+- Add `requireUser` / `requireAdmin` helpers here (consumed by T25–T27). Validation errors keep the §6 `{ error }` shape.
+- **Acceptance criteria (curl):** first register → ADMIN/APPROVED; second → PENDING; PENDING login → 403; approve directly in the DB for now → login 200 + cookie; `me` with cookie → 200, without → 401; logout → `me` 401; duplicate username (case variants) → 409; short password / bad username → 400.
+
+#### T24 — Auth UI: `/login` + `/register`
+**Status:** ⬜ TODO · **Depends on:** T23 · **Files:** `app/login/page.tsx`, `app/register/page.tsx`, `components/AuthCard.tsx` (shared shell)
+- `/register`: username, password, confirm (client-side mismatch check), inline server errors. On success show the **approval-pending state** — “Account created — an admin must approve it before you can sign in” + link to `/login`; first-account variant: “Admin account created — sign in to continue”.
+- `/login`: username + password, inline errors including the exact 403 PENDING/REJECTED messages, loading/disabled states, link to register.
+- Both: centered card, no app nav, minimal chrome; already-signed-in visitors redirect to `/`; keep classes token-friendly (T30/T31 restyle later).
+- **Acceptance criteria (SSR + T32 browser):** pages render 200; register flow reaches the pending state; wrong credentials show the error near the form; the first-account variant shows the admin message.
+
+#### T25 — Route protection + session-aware shell
+**Status:** ⬜ TODO · **Depends on:** T24 · **Files:** guard mechanism per the bundled Next docs (**read `node_modules/next/dist/docs/` first**, per AGENTS.md), `app/layout.tsx`, `components/Nav.tsx`, `lib/auth.ts`
+- Signed out: `/`, `/income`, `/expenses`, `/savings`, `/categories` and `/admin/**` redirect to `/login`; `/login` + `/register` redirect to `/` when signed in; `/admin/**` redirects non-admins to `/`.
+- Nav: signed-in username + **Log out** button; **Admin** link only for `role=ADMIN`.
+- Wire the shared session guard helper for APIs (data routes return **401** `Authentication required`; full roll-out in T26).
+- Record the chosen guard mechanism (middleware vs per-layout) in §12.
+- **Acceptance criteria:** logged-out visits to every app route redirect; login lands on `/` with username + logout visible; logout returns to signed-out behavior; a non-admin cannot open `/admin/users`; lint/build/test green.
+
+#### T26 — Per-account data scoping (multi-tenancy pass) + seed/README
+**Status:** ⬜ TODO · **Depends on:** T25 · **Files:** all `app/api/{categories,incomes,expenses,savings,overview}/**`, `prisma/seed.ts`, `README.md`, tests
+- Every data route: require a session (401 otherwise) and scope all reads/writes to `session.user.id` — categories, incomes, expenses, savings, overview; ownership-check every `categoryId` (another account's id → **404**, never 403/200); per-account Σ% ≤ 100 guard and per-account unique names (composite unique — D16).
+- `/api/overview`: income/spent/net-saved/wallet/savings-balance computed **for the session account only** (month + all-time scopes otherwise unchanged).
+- Seed: creates one **demo Admin** (credentials documented in README, e.g. `demo` / `demo12345`) and attaches the existing demo dataset to it; still DEV-ONLY + idempotent; wipe order updated (`savingsEntry → expense → income → category → user`).
+- README: registration/approval flow, session/`SESSION_SECRET` config row, demo credentials, “auth required” note in the API preamble, Docker `SESSION_SECRET` note.
+- Route-level regression tests (fake Prisma, two accounts): A cannot list/read/delete B's rows; cross-account `categoryId` → 404; the same category name is allowed in two accounts; overview isolated.
+- **Acceptance criteria:** two accounts on a dev server show fully separate data end-to-end; `npm test` green incl. isolation tests; lint/build green.
+
+#### T27 — Admin approvals (API + `/admin/users` UI)
+**Status:** ⬜ TODO · **Depends on:** T25 (T23 provides the account API) · **Files:** `app/api/admin/users/route.ts`, `app/api/admin/users/[id]/{approve,reject}/route.ts`, `app/admin/users/page.tsx`, `components/Nav.tsx`
+- API (ADMIN only → 403 otherwise; responses never include `passwordHash`): `GET /api/admin/users?status=PENDING|APPROVED|REJECTED|ALL`; `POST …/[id]/approve` and `…/[id]/reject` — `PENDING` only (already decided → **409** `Registration already decided`), unknown id → 404. Guards: an admin **cannot decide their own account**; an `ADMIN` can never be rejected here (no last-admin lockout).
+- UI `/admin/users`: pending registrations first (username, created date, Approve / Reject with a confirm on reject), then all members grouped by status; counts in the header; empty state “No pending registrations”; inline errors. Nav “Admin” link stays admin-only.
+- **Acceptance criteria (curl now, browser in T32):** register → appears PENDING → approve → that account can sign in; reject → sign-in shows the declined message; non-admin → 403/redirect; double-decide → 409; SSR checks pass.
+
+#### T28 — Overall Wallet balance (API + dashboard card)
+**Status:** ⬜ TODO · **Depends on:** T26 · **Files:** `app/api/overview/route.ts`, `lib/*` + tests, `app/page.tsx`, `README.md`
+- Formula (D18, per account): `walletBalanceCents = Σ all-time income − Σ all-time expenses − (Σ deposits − Σ withdrawals)` — cash on hand; **negative allowed** (shown red like the savings card); computed live, never stored.
+- Extend `/api/overview` with additive `walletBalanceCents` (all-time, independent of `month`); update the README payload sample.
+- Dashboard: new **“Wallet balance”** summary card (sub-line “All-time · cash not spent or saved” — copy may be tuned in T30), placed so the five cards wrap responsively (grid tweak).
+- Tests: formula unit tests (withdrawals return cash; negative case) + curl reconciliation — income 5000 − spent 200 − savings net 800 → **4000**, cross-checked against the Income/Expenses/Savings tabs of the same account.
+- **Acceptance criteria:** wallet reconciles after adds/deletes (no stored drift); an empty account shows ₱0.00; lint/build/tests green.
+
+#### T29 — Multi-select category filters (Expenses, Savings, Dashboard)
+**Status:** ⬜ TODO · **Depends on:** T26 · **Files:** `app/api/expenses/route.ts`, `app/api/savings/route.ts`, `lib/validation.ts`, `app/expenses/page.tsx`, `app/savings/page.tsx`, `app/page.tsx`, `components/*` (reusable multi-select), `README.md`
+- Semantics (D19): multi-select, OR-combined, per account — API `?categoryIds=1,2,3` on Expenses and Savings GET (malformed ids → 400; unknown ids simply match nothing). Dashboard filters rows **client-side** (data is already loaded) so summary cards stay account-wide.
+- Expenses: the single `categoryId` select becomes a multi-select (checkbox dropdown or toggle chips) + “Clear”; the list and the live “N expenses · Total” line follow the selection.
+- Savings: same control for SAVINGS-kind categories; the history list follows it and **`monthNetCents` is computed over the selected categories**; all-time `balanceCents` stays account-wide (document it).
+- Dashboard: filter rows by kind and/or selected categories; summary cards unchanged. Income tab: no category dimension — explicitly out of scope.
+- Tests: CSV parsing (valid / malformed / empty → all), route regression with two categories selected.
+- **Acceptance criteria:** selecting Needs + Wants on Expenses shows only those categories' rows with a matching total; savings month net follows the selection; dashboard rows filter; API tests green.
+
+#### T30 — UI polish pass (token layer, components, empty states)
+**Status:** ⬜ TODO · **Depends on:** T29 · **Files:** `app/globals.css`, `app/layout.tsx`, every page, `components/*`
+- Introduce a small **token layer** (CSS variables: surface / surface-muted / text / text-muted / border / accent / success / danger + radii/spacing) consumed via Tailwind utilities — this is the single palette T31 flips for Night mode.
+- Consistent typography hierarchy, buttons/inputs/badges/cards, focus-visible rings, hover/disabled/loading states, friendlier empty + error states, responsive audit (cards stack, lists scroll on mobile).
+- **No functional changes** — behavior and tests stay identical.
+- **Acceptance criteria:** every screen visually consistent in light mode; lint/build/tests green; no flow regressions (T32 browser pass).
+
+#### T31 — Night mode
+**Status:** ⬜ TODO · **Depends on:** T30 · **Files:** `app/globals.css`, `app/layout.tsx`, `components/ThemeToggle.tsx` (new), `components/Nav.tsx`, auth pages
+- Theme: **Light / Dark / System** (default System); toggle in the nav and reachable from `/login` / `/register`; persisted in `localStorage` (key e.g. `st-theme`).
+- **No flash of the wrong theme:** a tiny inline script sets the `dark` class on `<html>` before first paint; wire Tailwind v4's dark variant for the class strategy (check the installed Tailwind v4 setup in `globals.css`).
+- Audit every surface in dark: nav, cards, forms, badges/chips, progress bars, signed amounts (green/red contrast), over-budget red, empty states, auth cards.
+- **Acceptance criteria (browser, T32):** toggle switches instantly and persists across reloads; system preference respected; no FOUC on hard reload; all pages checked in both themes.
+
+#### T32 — Phase 2 QA / end-to-end verification
+**Status:** ⬜ TODO · **Depends on:** T21–T31 · **Files:** this file (Work Log) + small fixes
+- Mirror T16: flow matrix — register → approve → sign in per account; A/B isolation probes (lists, cross-account ids, overview); wallet reconciliation; multi-select filters; both themes; admin guards (non-admin 403, self-decide blocked, double-decide 409); session edge cases (tampered/expired cookie, logout); seed with the demo user; Docker image re-check incl. `SESSION_SECRET`.
+- Gates: `npm test`, `npm run lint`, `npm run build` + browser suite on the dev server and the production image; DB restored to fresh-empty afterwards; QA reports defects → PM queues fixes as T33+ (same convention as T17/T18).
+- **Acceptance criteria:** checklist logged with pass/fail; gates green; Work Log entry added; QA section updated by the QA agent.
 
 ---
 
@@ -332,7 +495,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 
 1. Set the task's **Status** to ✅ DONE (or ⛔ BLOCKED with a one-line reason).
 2. Update **Next up** at the top to the first task that is not ✅ and whose dependencies are all ✅.
-3. Update **Progress:** `done/16` and **Last updated:** date.
+3. Update **Progress:** (Phase 1 `done/20` · Phase 2 `done/12`) and **Last updated:** date.
 4. Append a row to the **Work Log** (§11): date · task · agent · 1–3 line summary · key files.
 5. Log any judgment calls in the **Agent decision log** (§12). If a call contradicts §3, STOP and add it to §13 Open questions instead.
 6. Keep this file the single source of truth — do not create parallel tracking docs.
@@ -362,6 +525,8 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T18 | Full-stack Developer | PATCH now counts the **current** kind's entries on kind change → 409 D9-style (`Cannot change kind: … — delete them first`); safe kind change + name/%/color edits still 200. Replay: `spentCents` unchanged (20000), savings-side variant blocked. Commit `5ecab99`. |
 | 2026-10-17 | T19 | Full-stack Developer | Currency USD → PHP (user decision, answers Q1): `APP_CURRENCY="PHP"` → `₱1,234.56`; only the constant + test expectations changed (T04 one-switch design). Commit `2940322`. |
 | 2026-10-17 | T20 | Full-stack Developer | Docker support: multi-stage standalone image + isolated Prisma CLI stage, entrypoint `migrate deploy → node server.js`, absolute `/app/data/dev.db` + volume; `.dockerignore` + README. `docker build` + `docker run` verified end-to-end (migrate, CRUD, PHP bundle, restart persistence). Commit `d0c4b3a`. |
+| 2026-10-17 | T17–T20 | Senior QA | Re-verification round 2: gates `npm test` 30/30 · lint clean · build green; API suite **197/197** (X1/X2 probes upgraded to hard assertions for both fixed defects) · lib checks all PASS (₱) · seed 12/12 + idempotent · real-browser 54/54 on dev server and 54/54 on the production Docker image · over-budget 3/3 · Docker in-container 15/15 + restart persistence. **BUG-QA-01/BUG-QA-02 verified fixed and closed.** DB wiped (0/0/0/0), dev server stopped, Docker artifacts removed. Details in §Senior QA. |
+| 2026-10-17 | PM | Project Manager | PM v2: added the **Phase 2 backlog (T21–T32)** — admin-approved accounts with per-account data (T21–T27), Overview **Wallet balance** (T28), **multi-select category filters** (T29), **UI polish + Night mode** (T30–T31), Phase 2 QA (T32). Superseded D2; new decisions D14–D21 (user answered Q4–Q7 the same day). Next up: **T21**. Housekeeping: repaired `node_modules/next` (left broken by an interrupted install — `npm install`) and verified the build. |
 
 ### 12. Agent decision log (provisional)
 
@@ -393,12 +558,20 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T20 · Docker base `node:24-bookworm-slim` + **standalone output** + **isolated Prisma CLI stage** (installs the lockfile's exact CLI version) · reason: the first attempt copying only `node_modules/prisma` + `node_modules/@prisma` failed at container start (`Cannot find module 'effect'` — CLI transitive dep); the isolated install is complete and version-pinned without shipping devDependencies.
 - 2026-10-17 · T20 · DB at **absolute** `file:/app/data/dev.db`, `VOLUME /app/data`, entrypoint runs `migrate deploy` on every start · reason: relative SQLite URLs are resolution-dependent and `prisma/` is not part of the standalone trace; absolute + volume is restart/upgrade safe, and a fresh volume still starts empty (D3).
 - 2026-10-17 · T20 · Docker **engine installed in WSL via apt solely to verify** the image (no Docker existed in this environment); test container/volume/image removed afterwards and host `prisma/dev.db` wiped · reason: end-to-end evidence for the deliverable; same system-install pattern as T01 (Node/git via apt as root); no repo file depends on the local Docker install.
+- 2026-10-17 · T17/T18 · QA upgraded the API suite's X1/X2 sections from **observations to hard assertions** encoding the fixed behavior (400 / 409 / invariants) and re-ran every suite · reason: an observation documents a defect once; an assertion protects the fix against regressions forever.
+- 2026-10-17 · T19 · QA suite currency expectations switched `$` → `₱` via a scoped transform (only a `$` directly before a digit, plus one escaped regex literal) across the browser/over-budget/lib scripts · reason: keeps every display assertion meaningful after PHP instead of deleting them; `QA` scripts still live outside the repo, `package.json` untouched (D11).
+- 2026-10-17 · T20 · QA **re-built and re-ran the Docker image** (as root: `wsl -u root` — the daemon was already installed by the dev but user `zane` lacks the `docker` group): fresh-volume boot, in-container T17/T18 replays (15/15), the full browser suite against the production container (:3001, 54/54), restart persistence; container/volume/image removed after · reason: independent end-to-end evidence for the production artifact rather than trusting the dev's log.
 
 ### 13. Open questions (for the human)
 
 - **Q1 — Currency/display locale:** ✅ **Answered 2026-10-17 — PHP.** Implemented in T19: `APP_CURRENCY = "PHP"`, amounts display as `₱1,234.56` (still integer cents under the hood).
 - **Q2 — Recurring salary:** MVP = one entry per paycheck, no auto-repeat. Confirm if you want monthly recurrence as a later feature.
 - **Q3 — Editing entries:** MVP = create + delete only. Confirm if quick edit of past income/expenses is needed soon.
+- **Q4 — Wallet balance meaning:** ✅ **Answered 2026-10-17 — cash on hand** (income − expenses − savings net; savings stay visible on the Savings card). → D18 / T28.
+- **Q5 — Category filter style:** ✅ **Answered 2026-10-17 — multi-select flat categories** (e.g. Needs + Wants together; no group model). → D19 / T29.
+- **Q6 — Admin bootstrap:** ✅ **Answered 2026-10-17 — first sign-up becomes Admin** (auto-approved); later registrations need approval. → D15 / T23.
+- **Q7 — Data scope per account:** ✅ **Answered 2026-10-17 — everything separate per account**; the Admin never sees other accounts' money data. → D16 / T21 + T26.
+- **Q8 — Account rules (defaults):** username 3–30 chars, unique case-insensitively; password ≥ 8 chars (D14). Override here if you want different rules.
 
 ---
 
@@ -593,7 +766,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 ## Senior QA
 
-> Independent verification of the T15-complete revision (last dev commit `2f4add3`) against §8 acceptance criteria and PM decisions D1–D13. **Role boundary:** QA tests and reports only — the defects below are queued for the Full-stack Developer as T17/T18; QA does not fix them. Last updated: 2026-10-17 · QA status: **T16 ✅ DONE** · Open items: Q7–Q8 (re-verification after T17/T18).
+> Independent verification in two rounds against §8 acceptance criteria and PM decisions D1–D13. **Round 1** (T15 revision `2f4add3`): T16 ✅ DONE — two defects logged → T17/T18. **Round 2 (2026-10-17)** on the final revision (`5ecab99` T17/T18 + `2940322` T19 + `d0c4b3a` T20): **Q7–Q8 ✅ DONE — both defects verified fixed and closed; T19/T20 independently verified. No open items.** **Role boundary:** QA tests and reports only — no source changes, no dependencies added (`package.json` untouched — D11). Last updated: 2026-10-17.
 
 ### QA task list
 
@@ -605,60 +778,69 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 | Q4 | Seed verification: fresh → seed → idempotent re-run → production guard | ✅ DONE |
 | Q5 | Real-browser pass (all "Deferred to QA" items in T06/T08/T10/T12/T14 + T16 UI checks) | ✅ DONE |
 | Q6 | Defect log with repro, evidence, suggested fixes → T17/T18 | ✅ DONE |
-| Q7 | Re-verify BUG-QA-01/BUG-QA-02 repros after T17/T18 (expect 400 / 409) | ⬜ TO-DO |
-| Q8 | Regression after T17/T18: gates + API suite + browser suite, DB wiped after | ⬜ TO-DO |
+| Q7 | Re-verify BUG-QA-01/BUG-QA-02 repros after T17/T18 (expect 400 / 409) | ✅ DONE — round 2: exact repros now 400 / 409 (see Defect log status lines) |
+| Q8 | Regression after T17/T18: gates + API suite + browser suite, DB wiped after | ✅ DONE — 30/30 · 197/197 · 54/54 (dev) · DB 0/0/0/0 |
+| Q9 | Verify T19 (PHP): UI texts, formatting lib, no USD leftovers, image chunks | ✅ DONE — ₱ in every suite; source scan clean; `PHP` in image chunks |
+| Q10 | Re-verify T20 Docker image: rebuild, boot, in-container guards, browser, persistence | ✅ DONE — 15/15 in-container · 54/54 browser on image · restart persistence |
 
 ### Method & environment
 
-- **Revision:** T15-complete worktree; QA made **no source changes** and added **no dependencies** (`package.json` untouched — D11).
-- **Environment:** WSL Debian · Node v24.22.0 · dev server `http://localhost:3000` · Prisma 6.19.3 (`prisma migrate status` → "Database schema is up to date!") · SQLite `prisma/dev.db`.
-- **Tooling (outside the repo, under `C:\Users\sonso\AppData\Local\Temp\opencode\`):** `qa\` = API/lib/seed suites; `qa-web\` = browser suite using `playwright-core` + the installed **system Edge (headless)** — real-browser evidence with zero repo dependencies.
-- **Data state:** every suite starts from and restores the empty DB (D3); final state 0 categories / 0 incomes / 0 expenses / 0 savings entries, dev server stopped.
+- **Revisions verified:** round 1 = `2f4add3` (T15); round 2 = `5ecab99` (T17/T18) + `2940322` (T19) + `d0c4b3a` (T20), docs `5145308`. QA made **no source changes** and added **no dependencies** (`package.json` untouched — D11).
+- **Environment:** WSL Debian · Node v24.22.0 · dev server `http://localhost:3000` · Prisma 6.19.3 · SQLite `prisma/dev.db` · Docker 26.1.5 (T20 re-verify; daemon operated as root).
+- **Tooling (outside the repo, under `C:\Users\sonso\AppData\Local\Temp\opencode\`):** `qa\` = API/lib/seed suites; `qa-web\` = real-browser suite using `playwright-core` + the installed **system Edge (headless)** plus the Docker check scripts — all evidence produced with zero repo dependencies.
+- **Data state:** every suite starts from and restores the empty DB (D3); final state 0 categories / 0 incomes / 0 expenses / 0 savings entries, dev server stopped, Docker container/volume/image removed.
 
 ### Results summary
 
 | Gate | Result |
 |------|--------|
-| `npm test` | ✅ 22/22 (3 files) |
-| `npm run lint` / `npm run build` | ✅ clean / ✅ green |
-| API suite (S0 + F1–F8 + E1–E8 + V/N/M/D + X1–X3/X6/X7) | ✅ 181/181 PASS · 8 observations → 2 defects |
-| Lib checks (allocation, money, dates, invariants) | ✅ all PASS |
-| Seed verification | ✅ 12/12 · idempotent re-run · `NODE_ENV=production` aborts non-zero |
-| Real-browser suite | ✅ 54/54 PASS · console clean except expected 400/409 from negative tests |
+| `npm test` | ✅ 30/30 (4 files) — incl. 8 new route-level regression tests |
+| `npm run lint` / `npm run build` | ✅ clean / ✅ green (13/13 pages) |
+| API suite (S0 + F1–F8 + E1–E8 + V/N/M/D + X1–X3/X6/X7; X1/X2 now hard assertions) | ✅ **197/197 PASS** · 1 observation |
+| Lib checks (allocation, money ₱, dates, invariants) | ✅ all PASS |
+| Seed verification | ✅ 12/12 · idempotent re-run |
+| Real-browser suite — dev server | ✅ 54/54 PASS · console clean except expected 400/409 |
 | Over-budget visual spot check | ✅ 3/3 (red bar `bg-red-500`, red label `text-red-600`, width clamped at 100%) |
+| Docker in-container checks (T20, fresh volume) | ✅ 15/15 PASS — boot, empty DB, T17/T18 guards, overview invariant |
+| Real-browser suite — production image (:3001) | ✅ 54/54 PASS |
+| Docker restart persistence | ✅ marker category survived `docker restart`; cleanup verified empty |
 
-### T01–T16 acceptance matrix
+### T01–T20 acceptance matrix (updated after round 2)
 
 | Task | Verdict | Notes (independent evidence) |
 |------|---------|------------------------------|
 | T01 | ✅ | build/lint green; `/` + all 4 pages 200 with nav and "Savings Tracker" title |
 | T02 | ✅ | `npx prisma -v` → 6.19.3; migrate status up to date; test/build scripts run |
 | T03 | ✅ | 4 tables exercised end-to-end by the suites; final counts 0/0/0/0 |
-| T04 | ✅ | 22/22 unit tests incl. every §8 T04 case; independent invariant re-check |
-| T05 | ⚠️ | All §8 T05 paths pass, but Σ=100.01 accepted → **BUG-QA-01** (T17) |
+| T04 | ✅ | 30/30 unit tests incl. every §8 T04 case; independent invariant re-check |
+| T05 | ✅ | all §8 T05 paths pass; Σ=100.01 now rejected (fix T17 — re-verified) — BUG-QA-01 closed |
 | T06 | ✅ | create/edit/delete, Σ>100 blocked with visible error, confirm dialog, onboarding empty state |
 | T07 | ✅ | month filters + year boundary, UTC-midnight storage, 400/404/204 lifecycle |
 | T08 | ✅ | split chips 1750/1250/1000/1000 exact, no Unallocated chip, delete, month grouping |
 | T09 | ✅ | kind mismatch 400 (exact message), unknown category 404, month+categoryId combine |
 | T10 | ✅ | add/list/delete, filters combine, totals update, empty states, submit disabled without categories |
 | T11 | ✅ | balance math exact, negative balance allowed (D7), all-time vs month distinction |
-| T12 | ✅ | deposit 1000 → withdraw 200 → $800 in UI, signed green/red rows, red negative card, delete |
+| T12 | ✅ | deposit 1000 → withdraw 200 → ₱800 in UI, signed green/red rows, red negative card, delete |
 | T13 | ✅ | reconciles with the three page APIs; zero-category payload 200; live recompute (D6) |
 | T14 | ✅ | cards reconcile; prev-month zeros + empty state; over-budget red + clamped bar; 4→1 col |
 | T15 | ✅ | fresh install onboarding; seed demo exact + idempotent + prod guard; icon/title present |
-| T16 | ✅ | this pass — checklist logged, gates green, Work Log entry added; defects queued as T17/T18 |
+| T16 | ✅ | round-1 pass — checklist logged, gates green, Work Log entry added; both defects queued as T17/T18 (since fixed + re-verified) |
+| T17 | ✅ | exact repros: POST 0.01% @ Σ100 → 400 `(would be 100.01%)`; PATCH → Σ100.01 → 400; Σ100 boundary still allowed; 99.99 + 0.01 → 201; overview never negative (API `X2.*` 6/6 PASS) |
+| T18 | ✅ | kind change with entries → 409; `spentCents` unchanged 21000; row stays attached; savings-side variant 409; safe kind change (no entries) 200 (API `X1.*` 12/12 PASS) |
+| T19 | ✅ | ₱1,234.56 everywhere (chips/cards/totals/negative/1¢) in real-browser runs on dev + image; lib checks ₱; no `USD`/`$` display left in `app/`, `components/`, `lib/`; `PHP` in image client chunks |
+| T20 | ✅ | `docker build` OK; fresh volume boots empty with migrations applied; non-root `node`; in-container T17/T18 guards 15/15; full browser suite 54/54 on the image; data survives `docker restart`; artifacts cleaned |
 
 ### F1–F8 flows (§8 T16)
 
 | Flow | Verdict | Evidence |
 |------|---------|----------|
-| F1 categories 35/25/20/20 saved | ✅ | B1: 4 rows, Total 100%, Unallocated $0.00, indicator green |
-| F2 income 5000.00 → 1750/1250/1000/1000 | ✅ | B2: chips $1,750.00 / $1,250.00 / $1,000.00 ×2; no Unallocated chip |
-| F3 expense 200 on Bills → remaining 1550 | ✅ | B3+B6: "of $1,750.00" + exact remaining (API 175000/20000/155000) |
-| F4 deposit 1000 → balance 1000 | ✅ | B4: DEPOSIT default, balance card $1,000 (API month-net 100000) |
-| F5 withdraw 200 → balance 800 | ✅ | B5: balance $800; rows signed +green / −red |
+| F1 categories 35/25/20/20 saved | ✅ | B1: 4 rows, Total 100%, Unallocated ₱0.00, indicator green |
+| F2 income 5000.00 → 1750/1250/1000/1000 | ✅ | B2: chips ₱1,750.00 / ₱1,250.00 / ₱1,000.00 ×2; no Unallocated chip |
+| F3 expense 200 on Bills → remaining 1550 | ✅ | B3+B6: "of ₱1,750.00" + exact remaining (API 175000/20000/155000) |
+| F4 deposit 1000 → balance 1000 | ✅ | B4: DEPOSIT default, balance card ₱1,000 (API month-net 100000) |
+| F5 withdraw 200 → balance 800 | ✅ | B5: balance ₱800; rows signed +green / −red |
 | F6 edit 35→40 blocked, then Needs 20 + retry → 40/20/20/20 | ✅ | B8: blocked error visible at Σ=100%; after retry saved, Total 100%, dashboard recomputed |
-| F7 prev month → zeros + empty states | ✅ | B7: Sep 2026 zeros + empty state; all-time balance $800 unchanged |
+| F7 prev month → zeros + empty states | ✅ | B7: Sep 2026 zeros + empty state; all-time balance ₱800 unchanged |
 | F8 delete category with expenses → blocked | ✅ | B9: blocked message + confirm dialog; API 409 |
 
 ### Edge cases (§8 T16 E1–E8 + QA extras)
@@ -669,7 +851,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 | E2 Σ<100 shows Unallocated | ✅ | B11: "Total: 80% · Unallocated: 20%" + chip; API 25000¢ |
 | E3 duplicate category name blocked | ✅ | API E3/E3b 409 (case-insensitive + upper); UI error surfaced |
 | E4 negative/zero amounts blocked | ✅ | API E4 (13 checks); B12 inline errors for invalid/negative/zero |
-| E5 1234.56 → 123456¢ round-trip | ✅ | API storage check; B11 displays $1,234.56 back |
+| E5 1234.56 → 123456¢ round-trip | ✅ | API storage check; B11 displays ₱1,234.56 back |
 | E6 expense↔savings mismatches rejected | ✅ | API E6/E6b 400 with exact messages; E6c/E6d unknown category 404 |
 | E7 withdrawal below zero → red balance | ✅ | API E7 negative allowed (D7), overview consistent; B10 red styling |
 | E8 year-boundary month navigation | ✅ | API E8 (16 checks: Dec-2025/Jan-2026 isolation, no leaks, balance continuity); month picker prev/next mechanics browser-verified (B7) |
@@ -677,7 +859,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 | X6 expense with no income (allocated 0) | ✅ | remaining negative, progress 0 per spec, no crash |
 | X7 zero-category app | ✅ | full income unallocated, valid payload, no 500 |
 
-### Defect log (for dev — QA does not fix)
+### Defect log (round 1 — both fixed in T17/T18 and re-verified in round 2)
 
 #### BUG-QA-01 — Σ% guard allows 100.01% (D5 violation) → **T17**
 - **Severity:** High (money math breaks: allocations exceed income).
@@ -686,6 +868,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Expected:** 400 `Total allocation cannot exceed 100% (would be 100.01%)`; `unallocatedCents ≥ 0` always (D5 + §7 invariant).
 - **Root cause:** both guards reject only `sumBp > 10001`; Σ=100.01% (= 10001 bp) slips through.
 - **Suggested fix:** `> 10000` in both guards + a regression test (full spec in T17).
+- **Status:** ✅ **FIXED in T17** (commit `5ecab99`) and **re-verified by QA 2026-10-17** — both repros now return 400 with the exact message; `Σ=100` stays valid and `99.99 + 0.01 → 201`; overview invariant holds (`unallocated ≥ 0`). Guarded by API assertions `X2.post-100.01-400`, `X2.patch-100.01-400`, `X2.overview-no-overshoot`, `X2.total-still-100`, `X2.needs-still-20`.
 
 #### BUG-QA-02 — kind change silently drops entries from totals (D8 violation) → **T18**
 - **Severity:** High (data integrity: rows stay attached but accounting silently changes).
@@ -693,6 +876,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Repro:** EXPENSE category with one 210.00 expense → overview `totals.spentCents` = 21000. `PATCH {"kind":"SAVINGS"}` → **200**. After: `spentCents` = 20000 (expense gone from spent) and the expense row is still attached to a SAVINGS-kind category (breaks D8).
 - **Expected:** 409 while entries of the current kind exist, D9-style message.
 - **Suggested fix:** count `expenses` / `savingsEntries` on kind change, return 409 if > 0 (full spec in T18).
+- **Status:** ✅ **FIXED in T18** (commit `5ecab99`) and **re-verified by QA 2026-10-17** — kind change with entries now 409 (`Cannot change kind … — delete them first`), `spentCents` unchanged (21000), row stays attached, kind stays EXPENSE; savings-side deposit variant also 409; entry-free kind change still 200. Guarded by API assertions `X1.kind-change-409`, `X1.spent-unchanged`, `X1.kind-unchanged`, `X1.savings-kind-change-409`.
 
 ### Minor observations (non-blocking, not queued)
 
@@ -703,9 +887,11 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 | Artifact | Path / command |
 |----------|----------------|
-| API suite + report | `qa\qa-t16-api.mjs` → `qa\qa-t16-api-report.json` (181 PASS) |
-| Lib checks | `qa\qa-t16-lib.ts` (run with `tsx`) |
-| Seed checks | `qa\qa-t16-seed.mjs` |
-| Browser suite + report + screenshots | `qa-web\qa-t16-browser.mjs` → `qa-web\qa-t16-browser-report.json`, `qa-web\shots\` (dashboard, income-chips, savings-negative, overbudget, …) |
+| API suite + report | `qa\qa-t16-api.mjs` → `qa\qa-t16-api-report.json` (**197 PASS**; X1/X2 are hard assertions for BUG-QA-01/02) |
+| Lib checks (₱ expectations) | `qa\qa-t16-lib.ts` (run with `tsx`) |
+| Seed checks | `qa\qa-t16-seed.mjs` (run after `npm run db:seed`) |
+| Browser suite + reports + screenshots | `qa-web\qa-t16-browser.mjs` → `qa-web\qa-t16-browser-report.json` (dev `:3000`) · copies `qa-t16-browser-report-dev.json` / `-docker.json` (both 54 PASS) · `qa-web\shots\` |
 | Over-budget visual check | `qa-web\qa-t16-overbudget.mjs` |
-| Re-run (WSL) | start `npm run dev` in the repo, then e.g. `node /mnt/c/Users/sonso/AppData/Local/Temp/opencode/qa/qa-t16-api.mjs` (pass `wipe` to reset the DB first); browser suites need the dev server as well |
+| Docker in-container checks + report | `qa-web\qa-t20-docker-checks.mjs` → `qa-web\qa-t20-docker-report.json` (15 PASS; image running on `:3001`) |
+| Docker persistence check | `qa-web\persist-create.mjs` → `docker restart qa-t20` → `qa-web\persist-check.mjs` |
+| Re-run (WSL) | start `npm run dev` in the repo, then e.g. `node /mnt/c/Users/sonso/AppData/Local/Temp/opencode/qa/qa-t16-api.mjs` (pass `wipe` to reset the DB first); browser suites need the dev server — or the Docker image via `qa-web\run-browser-docker.mjs` (port 3001) |
