@@ -7,6 +7,7 @@ import { toSavingsEntryDTO, type SavingsListResponse } from "@/lib/types";
 import {
   emptyToNull,
   monthSchema,
+  parseCategoryIdsParam,
   savingsCreateSchema,
   zodErrorMessage,
 } from "@/lib/validation";
@@ -26,23 +27,33 @@ async function netCents(where: Prisma.SavingsEntryWhereInput = {}): Promise<numb
   return net;
 }
 
-// GET /api/savings?month=YYYY-MM → the session account's entries of the month (category
-// included, newest first) plus all-time balance (D7) and the month's net.
-// `month` defaults to the current UTC month.
+// GET /api/savings?month=YYYY-MM&categoryIds=1,2,3 → the session account's entries of the
+// month (category included, newest first) plus all-time balance (D7) and the month's net.
+// `month` defaults to the current UTC month; an optional categoryIds filter (T29, OR)
+// narrows the entries AND the month net — the all-time balance stays account-wide.
 export async function GET(request: Request) {
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
 
-  const monthParam = new URL(request.url).searchParams.get("month") ?? currentMonth();
+  const params = new URL(request.url).searchParams;
+  const monthParam = params.get("month") ?? currentMonth();
+  const categoryIds = parseCategoryIdsParam(params.get("categoryIds"));
 
   const parsed = monthSchema.safeParse(monthParam);
   if (!parsed.success) {
     return NextResponse.json({ error: zodErrorMessage(parsed.error) }, { status: 400 });
   }
+  if (categoryIds === "invalid") {
+    return NextResponse.json(
+      { error: "categoryIds must be a comma-separated list of positive integers" },
+      { status: 400 },
+    );
+  }
   const { start, end } = parseMonth(parsed.data);
   const monthWhere: Prisma.SavingsEntryWhereInput = {
     userId: auth.user.id,
     date: { gte: start, lt: end },
+    ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
   };
 
   const [entries, monthNetCents, balanceCents] = await Promise.all([

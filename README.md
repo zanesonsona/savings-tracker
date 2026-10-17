@@ -43,9 +43,9 @@ The app starts **empty** (no users, no categories, no entries) — the first acc
 1. **Create an account** — open `/register`. The first account ever created becomes the app **admin** and is approved immediately; every later account lands as **pending** until an admin approves it at `/admin/users` — pending and declined accounts cannot sign in. Sign in at `/login`; the session lasts 30 days (httpOnly `st_session` cookie, signed with `SESSION_SECRET`). Each account only ever sees its own data — the admin included.
 2. **Create your categories** — open `/categories` (or the onboarding link on the dashboard). For each category set a name, a kind (**Expense** for spending buckets, **Savings** for savings buckets), a percentage of income, and an optional color. The running total must stay at or below **100%** per account; anything below 100% shows as **Unallocated** and is assigned to no category.
 3. **Log income** — open `/income`. Enter an amount (e.g. `5000.00`), an optional source, a date, and an optional note. Every income row shows its computed split across your categories (plus an *Unallocated* chip when Σ% < 100%).
-4. **Log expenses** — open `/expenses`. Expenses can only be filed against Expense-kind categories. Filter by month and category; the list and live total follow the active filters.
-5. **Track savings** — open `/savings`. Record deposits and withdrawals against Savings-kind categories. The balance card shows the **all-time** net (red when negative) and the month's net.
-6. **Read the dashboard** — open `/` (Dashboard). Pick a month and compare allocated vs actual per category, with Income / Spent / Net saved / **Wallet balance** summary cards plus the all-time savings balance.
+4. **Log expenses** — open `/expenses`. Expenses can only be filed against Expense-kind categories. Filter by month and categories (toggle chips — **Clear** resets; multi-select is OR-combined); the list and live total follow the active filters.
+5. **Track savings** — open `/savings`. Record deposits and withdrawals against Savings-kind categories. The balance card shows the **all-time** net (red when negative) and the month's net; multi-select filters narrow the list and the month's net, while the balance stays account-wide.
+6. **Read the dashboard** — open `/` (Dashboard). Pick a month and compare allocated vs actual per category, with Income / Spent / Net saved / **Wallet balance** summary cards plus the all-time savings balance. Category chips filter the rows below; the cards stay unchanged.
 7. **Fix mistakes by deleting** — entries are **create + delete only** (no editing in the MVP). Deleting an income/expense/savings entry is always allowed; deleting a category is blocked while it still has entries, and changing a category's kind is blocked while entries of its current kind exist. Allocations are recomputed live from the current percentages, so changing a % re-computes the plan for every month.
 
 ## Optional: demo data (DEV ONLY)
@@ -188,7 +188,7 @@ Errors: `404 Category not found`; `409 Cannot delete "Bills" — it has 3 expens
 
 ### Expenses
 
-**`GET /api/expenses`** → `200` `ExpenseDTO[]` with the category embedded, newest first. Filters: `?month=YYYY-MM` and `?categoryId=` (they combine).
+**`GET /api/expenses`** → `200` `ExpenseDTO[]` with the category embedded, newest first. Filters: `?month=YYYY-MM` and `?categoryIds=1,2,3` (they combine; the id list is OR-combined — T29). An empty `categoryIds=` means **all categories**, unknown ids match nothing, and a malformed list → `400 categoryIds must be a comma-separated list of positive integers`.
 
 ```json
 {
@@ -217,7 +217,7 @@ Errors: `404 Category not found` for an unknown `categoryId`; `400 Use Savings e
 
 ### Savings
 
-**`GET /api/savings`** → `200` with the month's entries, the all-time balance, and the month's net. `?month=YYYY-MM` is optional and defaults to the current UTC month.
+**`GET /api/savings`** → `200` with the month's entries, the all-time balance, and the month's net. `?month=YYYY-MM` is optional and defaults to the current UTC month. `?categoryIds=1,2,3` (T29, same syntax as Expenses) narrows the entries **and** `monthNetCents`; `balanceCents` always stays account-wide.
 
 ```json
 {
@@ -240,7 +240,7 @@ Errors: `404 Category not found` for an unknown `categoryId`; `400 Use Savings e
 
 - `entries` — the requested month's entries, newest first, category embedded.
 - `balanceCents` — **all-time** net across all savings categories (deposits − withdrawals); may be negative.
-- `monthNetCents` — net (deposits − withdrawals) for the requested month.
+- `monthNetCents` — net (deposits − withdrawals) for the requested month (after the `categoryIds` filter, when given).
 
 **`POST /api/savings`** → `201` with the created `SavingsEntryDTO`.
 
@@ -395,8 +395,8 @@ app/
     admin/users/        ADMIN-only: GET members (?status=) + POST [id]/{approve,reject}
     categories/         GET/POST + PATCH/DELETE [id]   (401 without session; per-account Σ% ≤ 100 + names)
     incomes/            GET (?month=)/POST + DELETE [id]
-    expenses/           GET (?month=&categoryId=)/POST + DELETE [id]   (EXPENSE categories only)
-    savings/            GET (?month= → entries + balance + month net)/POST + DELETE [id]
+    expenses/           GET (?month=&categoryIds=)/POST + DELETE [id]   (EXPENSE categories only)
+    savings/            GET (?month=&categoryIds= → entries + balance + month net)/POST + DELETE [id]
     overview/           GET (?month=) → dashboard aggregation payload (session account only)
 proxy.ts                cookie-only optimistic redirects for app routes (Next 16 proxy; no DB)
 lib/
@@ -414,6 +414,8 @@ components/
   AuthCard.tsx          centered card shell for the auth pages
   LoginForm.tsx         sign-in form (inline errors, loading state)
   RegisterForm.tsx      registration form (success states for admin vs pending)
+  AdminUsers.tsx        admin approvals UI (pending first, Approve/Reject, member groups)
+  CategoryMultiSelect.tsx toggle-chip multi-select for the Expenses/Savings/Dashboard filters (T29)
   Nav.tsx               session-aware nav: username, Log out, Admin link (ADMIN only)
   EmptyState.tsx        shared empty-state card
   ProgressBar.tsx       thin progress bar (red over 100%)

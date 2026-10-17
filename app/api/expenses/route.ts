@@ -8,19 +8,19 @@ import {
   emptyToNull,
   expenseCreateSchema,
   monthSchema,
-  parseIdParam,
+  parseCategoryIdsParam,
   zodErrorMessage,
 } from "@/lib/validation";
 
 // GET /api/expenses → the session account's ExpenseDTO[] (category included), newest first;
-// optional ?month=YYYY-MM and ?categoryId= filters (they combine).
+// optional ?month=YYYY-MM and ?categoryIds=1,2,3 filters (they combine; OR within the list — T29).
 export async function GET(request: Request) {
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
 
   const params = new URL(request.url).searchParams;
   const monthParam = params.get("month");
-  const categoryIdParam = params.get("categoryId");
+  const categoryIds = parseCategoryIdsParam(params.get("categoryIds"));
   const where: Prisma.ExpenseWhereInput = { userId: auth.user.id };
 
   if (monthParam !== null) {
@@ -32,12 +32,14 @@ export async function GET(request: Request) {
     where.date = { gte: start, lt: end };
   }
 
-  if (categoryIdParam !== null) {
-    const categoryId = parseIdParam(categoryIdParam);
-    if (categoryId === null) {
-      return NextResponse.json({ error: "Invalid categoryId" }, { status: 400 });
-    }
-    where.categoryId = categoryId;
+  if (categoryIds === "invalid") {
+    return NextResponse.json(
+      { error: "categoryIds must be a comma-separated list of positive integers" },
+      { status: 400 },
+    );
+  }
+  if (categoryIds) {
+    where.categoryId = { in: categoryIds };
   }
 
   const expenses = await prisma.expense.findMany({

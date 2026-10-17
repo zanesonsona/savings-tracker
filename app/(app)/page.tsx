@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import EmptyState from "@/components/EmptyState";
+import CategoryMultiSelect from "@/components/CategoryMultiSelect";
 import ProgressBar from "@/components/ProgressBar";
 import { apiFetch } from "@/lib/api";
 import { monthLabel, shiftMonth } from "@/lib/dates";
@@ -46,6 +47,8 @@ export default function DashboardPage() {
   const [monthState, setMonthState] = useState<string | null>(null);
   const clientMonth = useCurrentMonth();
   const month = monthState ?? clientMonth;
+  // Row filter (T29): [] = show every category; the summary cards ignore it.
+  const [categoryFilterIds, setCategoryFilterIds] = useState<number[]>([]);
 
   useEffect(() => {
     if (!month) return; // wait for the client-only month value
@@ -78,6 +81,12 @@ export default function DashboardPage() {
   const balanceTone = data && data.savingsBalanceCents < 0 ? "negative" : "default";
   const walletTone = data && data.walletBalanceCents < 0 ? "negative" : "default";
 
+  const rows = data?.categories ?? [];
+  const visibleRows =
+    categoryFilterIds.length > 0
+      ? rows.filter((row) => categoryFilterIds.includes(row.id))
+      : rows;
+
   return (
     <div className="space-y-6">
       <header>
@@ -109,6 +118,17 @@ export default function DashboardPage() {
         >
           Next →
         </button>
+        <CategoryMultiSelect
+          options={rows.map((row) => ({
+            id: row.id,
+            name: row.name,
+            kind: row.kind,
+            color: row.color,
+          }))}
+          selected={categoryFilterIds}
+          onChange={setCategoryFilterIds}
+          hint="Filters the rows below — cards stay unchanged."
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -167,8 +187,11 @@ export default function DashboardPage() {
               actionLabel="Add income"
             />
           ) : null}
-          <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
-            {data.categories.map((row) => (
+          {visibleRows.length === 0 ? (
+            <p className="text-sm text-slate-500">No categories match the current filter.</p>
+          ) : (
+            <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+              {visibleRows.map((row) => (
               <li key={row.id} className="p-4">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-900">
@@ -203,8 +226,9 @@ export default function DashboardPage() {
                   </span>
                 </div>
               </li>
-            ))}
-          </ul>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

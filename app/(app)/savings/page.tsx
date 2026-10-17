@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import EmptyState from "@/components/EmptyState";
+import CategoryMultiSelect from "@/components/CategoryMultiSelect";
 import { apiFetch } from "@/lib/api";
 import { monthLabel, shiftMonth } from "@/lib/dates";
 import { formatCents, toCents } from "@/lib/money";
@@ -43,6 +44,7 @@ export default function SavingsPage() {
   const [monthState, setMonthState] = useState<string | null>(null);
   const clientMonth = useCurrentMonth();
   const month = monthState ?? clientMonth;
+  const [categoryFilterIds, setCategoryFilterIds] = useState<number[]>([]); // [] = all categories
 
   const today = useToday();
   const [direction, setDirection] = useState<Direction>("DEPOSIT");
@@ -61,8 +63,12 @@ export default function SavingsPage() {
     let cancelled = false;
     (async () => {
       try {
+        const params = new URLSearchParams({ month });
+        if (categoryFilterIds.length > 0) {
+          params.set("categoryIds", categoryFilterIds.join(","));
+        }
         const [savingsData, categoryData] = await Promise.all([
-          apiFetch<SavingsListResponse>(`/api/savings?month=${month}`),
+          apiFetch<SavingsListResponse>(`/api/savings?${params.toString()}`),
           apiFetch<CategoryDTO[]>("/api/categories"),
         ]);
         if (!cancelled) {
@@ -81,7 +87,7 @@ export default function SavingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey, month]);
+  }, [refreshKey, month, categoryFilterIds]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -157,7 +163,8 @@ export default function SavingsPage() {
       <header>
         <h1 className="text-2xl font-semibold text-slate-900">Savings</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Track deposits and withdrawals across your savings categories.
+          Track deposits and withdrawals across your savings categories, filtered by month
+          and categories.
         </p>
       </header>
 
@@ -198,6 +205,12 @@ export default function SavingsPage() {
         >
           Next →
         </button>
+        <CategoryMultiSelect
+          options={savingsCategories}
+          selected={categoryFilterIds}
+          onChange={setCategoryFilterIds}
+          hint="Filters the list and the month's net — the balance stays all-time."
+        />
       </div>
 
       <form onSubmit={handleCreate} className="rounded-lg border border-slate-200 bg-white p-4">
@@ -300,6 +313,11 @@ export default function SavingsPage() {
             description="Create a category with kind = Savings (e.g., an emergency fund) before logging deposits or withdrawals."
             actionHref="/categories"
             actionLabel="Create categories"
+          />
+        ) : categoryFilterIds.length > 0 ? (
+          <EmptyState
+            title="No matching entries"
+            description="Nothing matches this month + category filter. Try another category or month."
           />
         ) : (
           <EmptyState

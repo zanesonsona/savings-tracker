@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import EmptyState from "@/components/EmptyState";
+import CategoryMultiSelect from "@/components/CategoryMultiSelect";
 import { apiFetch } from "@/lib/api";
 import { monthLabel, shiftMonth } from "@/lib/dates";
 import { formatCents, toCents } from "@/lib/money";
@@ -42,7 +43,7 @@ export default function ExpensesPage() {
   const [monthState, setMonthState] = useState<string | null>(null);
   const clientMonth = useCurrentMonth();
   const month = monthState ?? clientMonth;
-  const [categoryFilter, setCategoryFilter] = useState(""); // "" = all categories
+  const [categoryFilterIds, setCategoryFilterIds] = useState<number[]>([]); // [] = all categories
 
   const today = useToday();
   const [amount, setAmount] = useState("");
@@ -61,7 +62,9 @@ export default function ExpensesPage() {
     (async () => {
       try {
         const params = new URLSearchParams({ month });
-        if (categoryFilter) params.set("categoryId", categoryFilter);
+        if (categoryFilterIds.length > 0) {
+          params.set("categoryIds", categoryFilterIds.join(","));
+        }
         const [expenseData, categoryData] = await Promise.all([
           apiFetch<ExpenseDTO[]>(`/api/expenses?${params.toString()}`),
           apiFetch<CategoryDTO[]>("/api/categories"),
@@ -82,7 +85,7 @@ export default function ExpensesPage() {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey, month, categoryFilter]);
+  }, [refreshKey, month, categoryFilterIds]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -165,7 +168,7 @@ export default function ExpensesPage() {
         actionHref="/categories"
         actionLabel="Create categories"
       />
-    ) : categoryFilter ? (
+    ) : categoryFilterIds.length > 0 ? (
       <EmptyState
         title="No matching expenses"
         description="Nothing matches this month + category filter. Try another category or month."
@@ -186,7 +189,7 @@ export default function ExpensesPage() {
       <header>
         <h1 className="text-2xl font-semibold text-slate-900">Expenses</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Log spending against your expense categories, filtered by month.
+          Log spending against your expense categories, filtered by month and categories.
         </p>
       </header>
 
@@ -212,19 +215,12 @@ export default function ExpensesPage() {
         >
           Next →
         </button>
-        <select
-          value={categoryFilter}
-          onChange={(event) => setCategoryFilter(event.target.value)}
-          aria-label="Filter by category"
-          className={`ml-auto ${INPUT_CLASS}`}
-        >
-          <option value="">All categories</option>
-          {expenseCategories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
+        <CategoryMultiSelect
+          options={expenseCategories}
+          selected={categoryFilterIds}
+          onChange={setCategoryFilterIds}
+          hint="Filters the list and its total."
+        />
       </div>
 
       <form onSubmit={handleCreate} className="rounded-lg border border-slate-200 bg-white p-4">

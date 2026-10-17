@@ -8,6 +8,8 @@
 //   - the same category name is allowed in two accounts
 //   - /api/overview totals are isolated
 //   - no session → 401 `Authentication required`
+// T29 adds `?categoryIds=` multi-select coverage (OR within the list, empty →
+// all, malformed → 400, another account's ids match nothing).
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -100,10 +102,11 @@ vi.mock("@/lib/prisma", () => {
     return Object.entries(where).every(([key, cond]) => {
       const value = record[key];
       if (cond !== null && typeof cond === "object") {
-        const c = cond as { gte?: Date; lt?: Date; not?: unknown };
+        const c = cond as { gte?: Date; lt?: Date; not?: unknown; in?: unknown[] };
         if (c.gte !== undefined && !(value instanceof Date && value >= c.gte)) return false;
         if (c.lt !== undefined && !(value instanceof Date && value < c.lt)) return false;
         if ("not" in c && value === c.not) return false;
+        if ("in" in c && Array.isArray(c.in) && !c.in.includes(value)) return false;
         return true;
       }
       return value === cond;
@@ -255,6 +258,7 @@ function seedTwoAccounts(): void {
   state.categories = [
     { id: 11, name: "A-Bills", percentage: 100, kind: "EXPENSE", color: null, createdAt: day(1), userId: 1 },
     { id: 12, name: "A-Save", percentage: 0, kind: "SAVINGS", color: null, createdAt: day(1), userId: 1 },
+    { id: 13, name: "A-Fun", percentage: 0, kind: "EXPENSE", color: null, createdAt: day(1), userId: 1 },
     { id: 21, name: "B-Bills", percentage: 100, kind: "EXPENSE", color: null, createdAt: day(1), userId: 2 },
     { id: 22, name: "B-Save", percentage: 0, kind: "SAVINGS", color: null, createdAt: day(1), userId: 2 },
   ];
@@ -264,6 +268,7 @@ function seedTwoAccounts(): void {
   ];
   state.expenses = [
     { id: 51, amountCents: 3000, date: day(6), note: "A spend", createdAt: day(6), userId: 1, categoryId: 11 },
+    { id: 52, amountCents: 500, date: day(6), note: "A fun", createdAt: day(6), userId: 1, categoryId: 13 },
     { id: 61, amountCents: 7000, date: day(6), note: "B spend", createdAt: day(6), userId: 2, categoryId: 21 },
   ];
   state.savings = [
@@ -300,8 +305,7 @@ describe("list endpoints are scoped to the session account", () => {
   it("expenses (category included)", async () => {
     const res = await listExpenses(jsonRequest("/api/expenses", "GET"));
     const body = (await res.json()) as { id: number; category: { id: number } }[];
-    expect(body).toHaveLength(1);
-    expect(body[0].id).toBe(51);
+    expect(body.map((e) => e.id)).toEqual([51, 52]);
     expect(body[0].category.id).toBe(11);
 
     loginAs(2);
@@ -326,7 +330,7 @@ describe("list endpoints are scoped to the session account", () => {
   it("categories (usage counts included)", async () => {
     const res = await listCategories();
     const body = (await res.json()) as { id: number; expenseCount: number }[];
-    expect(body.map((c) => c.id)).toEqual([11, 12]);
+    expect(body.map((c) => c.id)).toEqual([11, 12, 13]);
     expect(body.find((c) => c.id === 11)?.expenseCount).toBe(1);
   });
 });
@@ -353,7 +357,7 @@ describe("cross-account ids behave like missing (404)", () => {
     expect(savings.status).toBe(404);
 
     expect(state.incomes).toHaveLength(2);
-    expect(state.expenses).toHaveLength(2);
+    expect(state.expenses).toHaveLength(3);
     expect(state.savings).toHaveLength(2);
   });
 
@@ -396,6 +400,70 @@ describe("cross-account ids behave like missing (404)", () => {
   });
 });
 
+describe("?categoryIds= multi-select filter (T29)", () => {
+  it("expenses: OR within the list; empty → all; unknown → none; malformed → 400", async () => {
+    const both = await listExpenses(jsonRequest("/api/expenses?categoryIds=11,13", "GET"));
+    const bothBody = (await both.json()) as { id: number }[];
+    expect(bothBody.map((e) => e.id)).toEqual([51, 52]);
+
+    const one = await listExpenses(jsonRequest("/api/expenses?categoryIds=13", "GET"));
+    const oneBody = (await one.json()) as { id: number }[];
+    expect(oneBody.map((e) => e.id)).toEqual([52]);
+
+    const empty = await listExpenses(jsonRequest("/api/expenses?categoryIds=", "GET"));
+    expect(((await empty.json()) as unknown[]).length).toBe(2);
+
+    const unknown = await listExpenses(jsonRequest("/api/expenses?categoryIds=999", "GET"));
+    expect(((await unknown.json()) as unknown[]).length).toBe(0);
+
+    const malformed = await listExpenses(jsonRequest("/api/expenses?categoryIds=abc", "GET"));
+    expect(malformed.status).toBe(400);
+    await expect(malformed.json()).resolves.toEqual({
+      error: "categoryIds must be a comma-separated list of positive integers",
+    });
+  });
+
+  it("expenses: another account's id matches nothing (no cross-account peek)", async () => {
+    const res = await listExpenses(jsonRequest("/api/expenses?categoryIds=21", "GET"));
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as unknown[]).length).toBe(0);
+  });
+
+  it("savings: the filter narrows entries and the month net; the balance stays account-wide", async () => {
+    const created = await postCategory(
+      jsonRequest("/api/categories", "POST", { name: "A-Trip", percentage: 0, kind: "SAVINGS" }),
+    );
+    const category = (await created.json()) as { id: number };
+    const posted = await postSavings(
+      jsonRequest("/api/savings", "POST", {
+        amountCents: 3000,
+        direction: "DEPOSIT",
+        date: `${MONTH}-08`,
+        categoryId: category.id,
+      }),
+    );
+    expect(posted.status).toBe(201);
+    const tripEntryId = state.savings.at(-1)?.id;
+
+    const filtered = await listSavings(
+      jsonRequest(`/api/savings?month=${MONTH}&categoryIds=${category.id}`, "GET"),
+    );
+    const body = (await filtered.json()) as {
+      entries: { id: number }[];
+      monthNetCents: number;
+      balanceCents: number;
+    };
+    expect(body.entries.map((e) => e.id)).toEqual([tripEntryId]);
+    expect(body.monthNetCents).toBe(3000);
+    expect(body.balanceCents).toBe(8000); // account-wide: 5000 + 3000
+
+    const malformed = await listSavings(
+      jsonRequest(`/api/savings?month=${MONTH}&categoryIds=1,,2`, "GET"),
+    );
+    expect(malformed.status).toBe(400);
+  });
+});
+
 describe("category names may repeat across accounts, never within one", () => {
   it("the same name is creatable in both accounts", async () => {
     loginAs(1);
@@ -423,11 +491,11 @@ describe("/api/overview is isolated per account", () => {
       categories: { id: number }[];
     };
     expect(body.incomeTotalCents).toBe(10000);
-    expect(body.totals.spentCents).toBe(3000);
+    expect(body.totals.spentCents).toBe(3500);
     expect(body.totals.netSavedCents).toBe(5000);
-    expect(body.walletBalanceCents).toBe(2000); // 10000 − 3000 − 5000 (T28, per account)
+    expect(body.walletBalanceCents).toBe(1500); // 10000 − 3500 − 5000 (T28, per account)
     expect(body.savingsBalanceCents).toBe(5000);
-    expect(body.categories.map((c) => c.id).sort()).toEqual([11, 12]);
+    expect(body.categories.map((c) => c.id).sort()).toEqual([11, 12, 13]);
   });
 
   it("bob sees only his totals", async () => {

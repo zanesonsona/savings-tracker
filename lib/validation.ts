@@ -60,6 +60,28 @@ export function parseIdParam(raw: string): number | null {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
+/**
+ * Parse `?categoryIds=1,2,3` (D19/T29 — multi-select, OR-combined). Returns:
+ *   - `null` for an absent or empty parameter → no filter (all categories),
+ *   - the de-duplicated id list otherwise,
+ *   - `"invalid"` when any entry is not a positive integer (routes → 400).
+ * Well-formed but unknown ids are allowed: they simply match nothing.
+ */
+export function parseCategoryIdsParam(raw: string | null): number[] | null | "invalid" {
+  if (raw === null) return null;
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  const ids: number[] = [];
+  for (const part of trimmed.split(",")) {
+    const piece = part.trim();
+    if (!/^\d+$/.test(piece)) return "invalid";
+    const id = Number(piece);
+    if (!Number.isSafeInteger(id) || id < 1) return "invalid";
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
 // --- Shared request fragments (incomes / expenses / savings) ---
 
 export const moneyAmountSchema = z
