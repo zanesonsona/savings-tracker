@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v2 (Phase 2 added) · **Next up:** T23 — Auth API (register / login / logout / me) + admin bootstrap · **Progress:** Phase 1: 20/20 ✅ (T01–T20) · Phase 2: 2/12 (T21–T22 ✅ · T23–T32 ⬜)
+**Last updated:** 2026-10-17 · **Plan version:** PM v2 (Phase 2 added) · **Next up:** T24 — Auth UI: `/login` + `/register` · **Progress:** Phase 1: 20/20 ✅ (T01–T20) · Phase 2: 3/12 (T21–T23 ✅ · T24–T32 ⬜)
 
 ### 1. Vision
 
@@ -409,12 +409,13 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Result (2026-10-17):** ✅ `lib/auth.ts` shipped on `node:crypto` only (no new deps — D11/D17): scrypt `hashPassword`/`verifyPassword` (random 16-byte salt, `scrypt$<salt>$<hash>` b64url, timing-safe compare) + HMAC-SHA256 session tokens `<payload b64url>.<hmac b64url>` over `{ uid, exp }` (30-day TTL; expired/tampered/wrong-secret/malformed → `null`) + async `setSessionCookie`/`clearSessionCookie` on the Next 16 async `cookies()` API (httpOnly, `SameSite=Lax`, `Secure` in production). `getSessionSecret()`: env → as-is; production missing → **throws** (fail fast); dev/test → fixed fallback + one-time warning. `lib/auth.test.ts` **13/13** (hash format, salted duplicates, round-trip, tampered signature/payload, expiry boundary, wrong secret, malformed, fallback/fail-fast). Gates: `npm test` **43/43** (5 files) · lint clean · `next build` green (13/13 — its `tsc` pass caught a read-only `NODE_ENV` write in the tests, fixed). `.env.example` + README document `SESSION_SECRET`; Docker example passes `-e SESSION_SECRET="$(openssl rand -base64 32)"`. Commit `3ac82e2`.
 
 #### T23 — Auth API (register / login / logout / me) + admin bootstrap
-**Status:** ⬜ TODO · **Depends on:** T21, T22 · **Files:** `app/api/auth/{register,login,logout,me}/route.ts`, `lib/validation.ts`, `lib/types.ts`, `lib/auth.ts`
+**Status:** ✅ DONE · **Depends on:** T21 ✅, T22 ✅ · **Files:** `app/api/auth/{register,login,logout,me}/route.ts`, `lib/validation.ts`, `lib/types.ts`, `lib/auth.ts`
 - `POST /api/auth/register` — `{ username, password }`: username trimmed 3–30 (`A–Z a–z 0–9 . _ -`), unique case-insensitively → 409 `Username "X" is already taken`; password ≥ 8 chars (400 otherwise). Creates `USER`+`PENDING` → 201 `{ user, message }` — **except the first-ever account: `ADMIN`+`APPROVED`** (D15; also claims legacy rows if any per T21/D21), with a distinct message. No auto-login either way.
 - `POST /api/auth/login` — 401 `Invalid username or password` (identical message for unknown user vs wrong password); **403 `Account pending admin approval`** for `PENDING`; **403 `This account registration was declined`** for `REJECTED`; on success set the session cookie → 200 `{ user }`.
 - `POST /api/auth/logout` → clears the cookie, 204. `GET /api/auth/me` → the session user re-read from the DB (incl. `role`/`status`), or 401.
 - Add `requireUser` / `requireAdmin` helpers here (consumed by T25–T27). Validation errors keep the §6 `{ error }` shape.
 - **Acceptance criteria (curl):** first register → ADMIN/APPROVED; second → PENDING; PENDING login → 403; approve directly in the DB for now → login 200 + cookie; `me` with cookie → 200, without → 401; logout → `me` 401; duplicate username (case variants) → 409; short password / bad username → 400.
+- **Result (2026-10-17):** ✅ All four routes shipped as specced: register (case-insensitive duplicate check in JS → 409; first-ever account → `ADMIN`/`APPROVED` **and claims NULL-owner rows** in one `$transaction` — D15/D21 verified end-to-end with a pre-accounts category; later accounts `USER`/`PENDING`; 201 `{ user, message }`, no auto-login); login (identical 401 for unknown/wrong; status gate **after** password verify → 403 pending/declined; success → cookie + `{ user }`); logout → 204; `me` → `{ user }` (re-read from DB) or 401 `Authentication required`. `lib/auth.ts` gained `getSessionUser()` + `requireUser()`/`requireAdmin()` guards (T25–T27 consumers; signed out → 401, session whose status is no longer APPROVED → 403 with the login messages); `UserDTO`/`toUserDTO` never expose `passwordHash`. Evidence: **48/48** curl checks (bootstrap claim, cookie flags HttpOnly/Lax/Path=/ and no Secure in dev, tampered cookie → 401, logout → me 401, deleted-user session → 401, case-variant duplicate → 409, validation 400s incl. non-JSON body); DB left fresh-empty. Gates: 43/43 tests · lint clean · build green. Commit `a04362f`.
 
 #### T24 — Auth UI: `/login` + `/register`
 **Status:** ⬜ TODO · **Depends on:** T23 · **Files:** `app/login/page.tsx`, `app/register/page.tsx`, `components/AuthCard.tsx` (shared shell)
@@ -532,6 +533,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | PM | Project Manager | PM v2: added the **Phase 2 backlog (T21–T32)** — admin-approved accounts with per-account data (T21–T27), Overview **Wallet balance** (T28), **multi-select category filters** (T29), **UI polish + Night mode** (T30–T31), Phase 2 QA (T32). Superseded D2; new decisions D14–D21 (user answered Q4–Q7 the same day). Next up: **T21**. Housekeeping: repaired `node_modules/next` (left broken by an interrupted install — `npm install`) and verified the build. |
 | 2026-10-17 | T21 | Full-stack Developer | Auth data model: `User` (+ username/role/status/decidedAt) and `userId` FK/index on all four data models, `Category.name` → `@@unique([userId, name])`; migration `20261017044443_phase2_accounts` applied on the empty dev DB (5 tables, 0 users); gates green (30/30 tests) + fresh-DB end-to-end smoke 14/14; nullable-during-rollout call logged in §12 (**T26 tightens**). Commit `3070c50`. |
 | 2026-10-17 | T22 | Full-stack Developer | Auth core: `lib/auth.ts` — scrypt hashing (salted, timing-safe) + `st_session` HMAC-SHA256 tokens (30 d, httpOnly/Lax/Secure-in-prod; prod fails fast without `SESSION_SECRET`, dev fallback + warning) + async cookie helpers per the bundled Next 16 `cookies()` docs; 13 unit tests (tamper/expiry/wrong-secret/malformed). Gates 43/43 · lint · build green; `.env.example` + README (`SESSION_SECRET` row + Docker `-e` note). Commit `3ac82e2`. |
+| 2026-10-17 | T23 | Full-stack Developer | Auth API: register (admin bootstrap D15 — first account ADMIN/APPROVED + NULL-row claim; else USER/PENDING; 409 case-variant dupes; 400 validation), login (401 identical / 403 pending·declined / cookie on success), logout 204, me; `requireUser`/`requireAdmin` + `getSessionUser` guards; `UserDTO`. 48/48 curl checks (claim, cookie flags, tamper, deleted-user, logout) · gates 43/43 · DB left fresh-empty. Commit `a04362f`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -791,6 +793,15 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Evidence:** `npm test` **43/43** (5 files) · `npm run lint` clean · `npm run build` green (13/13; type-check included the new files).
 - **Non-goal note:** no routes/UI/DB changes — registration/login land in T23/T24.
 - **Acceptance criteria (§8 T22):** ✅ `npm test` green incl. the new file · ✅ lint/build green.
+
+### T23 — Auth API + admin bootstrap ✅
+- **Commit:** `a04362f T23: auth API (register/login/logout/me) + admin bootstrap`
+- **Files:** `app/api/auth/{register,login,logout,me}/route.ts`, `lib/validation.ts`, `lib/types.ts`, `lib/auth.ts`.
+- **Routes:** `POST /api/auth/register` — zod (`usernameSchema` 3–30 + `A-Za-z0-9._-`, `passwordSchema` ≥ 8 ≤ 200); JS case-insensitive duplicate check (D16 pattern) → 409 `Username "X" is already taken`; **first-ever account** → `ADMIN`/`APPROVED` and claims all NULL-owner rows in one `$transaction` (D15/D21 — verified: a category created before the first account ends up owned by the admin); later accounts → `USER`/`PENDING`; 201 `{ user, message }`, never auto-logs-in. `POST /api/auth/login` — 401 `Invalid username or password` for unknown OR wrong (identical); status gate **after** password verify: PENDING → 403 `Account pending admin approval`, REJECTED → 403 `This account registration was declined`; success → `setSessionCookie` + 200 `{ user }`. `POST /api/auth/logout` → clears cookie, 204. `GET /api/auth/me` → session user re-read from the DB or 401 `Authentication required`.
+- **Guards (T25–T27 consumers):** `getSessionUser()` (cookie → verify → DB; unknown/expired/tampered → null) and `requireUser()` / `requireAdmin()` returning `{ user } | { response }` — signed out → 401, session not APPROVED anymore → 403 (pending/declined), non-admin under `requireAdmin` → 403 `Admin access required`.
+- **DTO:** `UserDTO` + `toUserDTO` (`lib/types.ts`) — id/username/role/status/createdAt/decidedAt only; `passwordHash` never leaves the DB.
+- **Evidence:** **48/48** curl checks against the dev server — bootstrap claim + scrypt hash in DB, response DTO shape, 409/400 validation matrix (case variants, short password, bad chars, non-JSON), identical 401s, PENDING/REJECTED 403s, cookie flags (HttpOnly, SameSite=Lax, Path=/; no Secure in dev), `me` 200/tampered 401/after-logout 401/deleted-user 401, approve-in-DB → login 200. Gates: `npm test` **43/43** · lint clean · build green. DB left fresh-empty (0 users / 0 categories).
+- **Acceptance criteria (§8 T23):** ✅ every listed curl path verified.
 
 ---
 
