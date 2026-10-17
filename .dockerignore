@@ -1,0 +1,28 @@
+# Keep the build context lean — node_modules and .next are rebuilt inside the image.
+
+# dependencies / build output
+node_modules
+.next
+out
+build
+
+# local database — runtime data lives on the /app/data volume instead
+*.db
+*.db-journal
+
+# env files — the image sets its own DATABASE_URL (absolute /app/data path)
+.env
+.env.*
+
+# VCS, tooling and docs not needed for the build
+.git
+.gitignore
+AGENTS.md
+Project_state.md
+Dockerfile
+docker-compose*.yml
+.vscode
+.idea
+coverage
+npm-debug.log*
+*.log

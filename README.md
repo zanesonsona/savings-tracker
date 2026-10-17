@@ -21,6 +21,7 @@ A local, single-user web app to plan and track your money: log your income, spli
 
 - Node.js 22+ and npm (developed on Node 24 LTS).
 - No database server required — Prisma uses a local SQLite file (`prisma/dev.db`).
+- Optional: Docker (any modern version) if you prefer to run the app as a container — see [Run with Docker](#run-with-docker).
 
 ## Setup
 
@@ -40,6 +41,18 @@ npm run db:seed
 ```
 
 This wipes all tables and inserts a small demo dataset (categories 35/25/20/20, 2 incomes, 4 expenses, 1 savings deposit dated relative to the current month). Re-run it anytime to reset. It is intentionally opt-in — the app itself always starts empty.
+
+## Run with Docker
+
+```bash
+docker build -t savings-tracker .
+docker run --rm -p 3000:3000 -v savings-data:/app/data savings-tracker
+# → http://localhost:3000
+```
+
+- Multi-stage image built on Next.js **standalone output**; the container applies pending Prisma migrations automatically on startup.
+- The SQLite database is created at `/app/data/dev.db` **inside the container** (override with the `DATABASE_URL` env var); the `savings-data` volume keeps it across restarts and upgrades. A fresh volume starts **empty** — create your categories in the UI.
+- To reset the demo/data: `docker volume rm savings-data`.
 
 ## Scripts
 
@@ -65,7 +78,7 @@ app/
   savings/page.tsx      Savings balance, deposits/withdrawals history
   categories/page.tsx   Create/edit/delete categories, Σ% indicator
   api/
-    categories/         GET/POST + PATCH/DELETE [id]   (Σ% ≤ 100.01, unique names, delete guarded)
+    categories/         GET/POST + PATCH/DELETE [id]   (Σ% ≤ 100, unique names, delete/kind-change guarded)
     incomes/            GET (?month=)/POST + DELETE [id]
     expenses/           GET (?month=&categoryId=)/POST + DELETE [id]   (EXPENSE categories only)
     savings/            GET (?month= → entries + balance + month net)/POST + DELETE [id]
@@ -86,11 +99,14 @@ components/
 prisma/
   schema.prisma         4 models: Category, Income, Expense, SavingsEntry
   seed.ts               DEV-ONLY demo seeder
+Dockerfile              multi-stage production image (standalone output; migrations on start)
+docker-entrypoint.sh    runs `prisma migrate deploy`, then the Next.js server
 ```
 
 ### Money & data rules (short version)
 
-- All amounts are stored as **integer cents**; dates are plain calendar days stored as UTC midnights.
+- All amounts are stored as **integer cents** (PHP centavos); dates are plain calendar days stored as UTC midnights.
+- Money is displayed as **Philippine pesos (₱)** — the single switch is `APP_CURRENCY` in `lib/constants.ts`.
 - `Category.kind` is `"EXPENSE" | "SAVINGS"`; expenses only accept EXPENSE categories, savings entries only SAVINGS ones.
 - Allocations are computed **live** from the current percentages (editing a % re-computes history — by design).
 - Savings balance = Σ deposits − Σ withdrawals across all savings categories, all-time.
