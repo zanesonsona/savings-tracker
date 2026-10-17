@@ -61,6 +61,7 @@ This wipes all tables and inserts a small demo dataset (categories 35/25/20/20, 
 | Variable | Default | Where set | Purpose |
 |----------|---------|-----------|---------|
 | `DATABASE_URL` | `file:./dev.db` | `.env` (copy from `.env.example`); `file:/app/data/dev.db` in the Docker image | SQLite database file used by Prisma. Relative paths resolve against `prisma/schema.prisma`, so the dev default lives at `prisma/dev.db`. |
+| `SESSION_SECRET` | (none) | `.env` (copy from `.env.example`); runtime env in Docker | HMAC-SHA256 key that signs the `st_session` cookie. **Required in production** — sign-in/session checks fail fast without it; development falls back to a fixed insecure secret with a console warning. Generate with `openssl rand -base64 32`. |
 | `PORT` | `3000` | Runtime / Docker | Port the Next.js server binds (container default 3000). |
 | `HOSTNAME` | `0.0.0.0` (Docker image) | Runtime / Docker | Bind address for the standalone server in the container. |
 | `NODE_ENV` | `development` | Next.js / Prisma | `production` enables Next production behavior and makes the dev-only seed script abort. |
@@ -314,9 +315,13 @@ The overview response matches the sample payload above (Bills allocated 200000 /
 
 ```bash
 docker build -t savings-tracker .
-docker run --rm -p 3000:3000 -v savings-data:/app/data savings-tracker
+docker run --rm -p 3000:3000 \
+  -e SESSION_SECRET="$(openssl rand -base64 32)" \
+  -v savings-data:/app/data savings-tracker
 # → http://localhost:3000
 ```
+
+- The container runs in production mode, so `SESSION_SECRET` is required (sign-in fails fast without it). Pass a **stable** value — sessions are signed with it, so changing it signs everyone out.
 
 - Multi-stage image built on Next.js **standalone output**; the container applies pending Prisma migrations automatically on startup and runs as the non-root `node` user.
 - The SQLite database is created at `/app/data/dev.db` **inside the container** (override with the `DATABASE_URL` env var); the `savings-data` volume keeps it across restarts and upgrades. A fresh volume starts **empty** — create your categories in the UI.
