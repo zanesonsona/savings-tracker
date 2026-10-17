@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v2 (Phase 2 added) · **Next up:** T22 — Auth core library (scrypt hashes + signed sessions) with unit tests · **Progress:** Phase 1: 20/20 ✅ (T01–T20) · Phase 2: 1/12 (T21 ✅ · T22–T32 ⬜)
+**Last updated:** 2026-10-17 · **Plan version:** PM v2 (Phase 2 added) · **Next up:** T23 — Auth API (register / login / logout / me) + admin bootstrap · **Progress:** Phase 1: 20/20 ✅ (T01–T20) · Phase 2: 2/12 (T21–T22 ✅ · T23–T32 ⬜)
 
 ### 1. Vision
 
@@ -389,7 +389,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 
 ### Phase 2 backlog — Accounts, Wallet, Filters & UX (T21–T32)
 
-> **Planned:** 2026-10-17 (PM v2; decisions D14–D21 confirmed with the user the same day). **Phase 1 is complete (T01–T20 ✅); Phase 2 is underway — T21 ✅, next is T22.** Same rule as above: never start a task whose dependencies are not ✅.
+> **Planned:** 2026-10-17 (PM v2; decisions D14–D21 confirmed with the user the same day). **Phase 1 is complete (T01–T20 ✅); Phase 2 is underway — T21–T22 ✅, next is T23.** Same rule as above: never start a task whose dependencies are not ✅.
 
 #### T21 — Auth data model + migration (User + per-account ownership)
 **Status:** ✅ DONE · **Depends on:** T20 ✅ · **Files:** `prisma/schema.prisma`, `prisma/migrations/*`
@@ -400,12 +400,13 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - **Result (2026-10-17):** ✅ `User` model + per-account ownership landed; migration `20261017044443_phase2_accounts` applied cleanly on the (verified-empty) dev DB — SQLite table-redefine adds a **nullable** `userId` FK (`ON DELETE CASCADE`) + `@@index([userId])` to the four data models and swaps `Category.name` global unique → `@@unique([userId, name])`; 5 tables / 0 users confirmed via Prisma counts + `sqlite_master`/pragma probes; `npm test` 30/30 · lint clean · build green (13/13). Fresh-DB smoke: the full pre-auth flow still works end-to-end (overview reconciles `10000/8000/500/300/300`; deletes 204) and the DB is left fresh-empty. Commit `3070c50`. **Transition call (T21→T26 rollout — rationale in §12):** `userId` ships **nullable** — required fails `tsc` at the 5 pre-auth create sites (probe: 18 errors) and no user may exist before T23 (D3/D15); the first Admin claims NULL-owner rows (T23/D21) and **T26 tightens to required** (§5 target).
 
 #### T22 — Auth core library (scrypt hashes + signed sessions) with unit tests
-**Status:** ⬜ TODO · **Depends on:** T21 · **Files:** `lib/auth.ts`, `lib/auth.test.ts`, `.env.example`, `README.md`
+**Status:** ✅ DONE · **Depends on:** T21 ✅ · **Files:** `lib/auth.ts`, `lib/auth.test.ts`, `.env.example`, `README.md`
 - `hashPassword` / `verifyPassword` with Node's built-in `crypto.scrypt` — random per-account salt, timing-safe compare, encoded format (e.g. `scrypt$<salt>$<hash>`). **No new npm deps** (D11/D17).
 - Session helpers: `createSessionToken(userId)` / `verifySessionToken(token)` — base64url JSON `{ uid, exp }` + HMAC-SHA256 with `SESSION_SECRET`; `setSessionCookie` / `clearSessionCookie` (httpOnly, `SameSite=Lax`, path `/`; `Secure` in production; 30-day expiry).
 - `SESSION_SECRET`: add to `.env.example` + the README configuration table; **production with no secret fails fast**; development falls back to a fixed dev-only secret with a console warning. Docker README note: pass `-e SESSION_SECRET=…`.
 - Tests: hash ≠ password; verify true/false; the same password produces different hashes (salted); token round-trip; tampered, expired, wrong-secret and malformed tokens rejected.
 - **Acceptance criteria:** `npm test` green including the new file; lint/build green.
+- **Result (2026-10-17):** ✅ `lib/auth.ts` shipped on `node:crypto` only (no new deps — D11/D17): scrypt `hashPassword`/`verifyPassword` (random 16-byte salt, `scrypt$<salt>$<hash>` b64url, timing-safe compare) + HMAC-SHA256 session tokens `<payload b64url>.<hmac b64url>` over `{ uid, exp }` (30-day TTL; expired/tampered/wrong-secret/malformed → `null`) + async `setSessionCookie`/`clearSessionCookie` on the Next 16 async `cookies()` API (httpOnly, `SameSite=Lax`, `Secure` in production). `getSessionSecret()`: env → as-is; production missing → **throws** (fail fast); dev/test → fixed fallback + one-time warning. `lib/auth.test.ts` **13/13** (hash format, salted duplicates, round-trip, tampered signature/payload, expiry boundary, wrong secret, malformed, fallback/fail-fast). Gates: `npm test` **43/43** (5 files) · lint clean · `next build` green (13/13 — its `tsc` pass caught a read-only `NODE_ENV` write in the tests, fixed). `.env.example` + README document `SESSION_SECRET`; Docker example passes `-e SESSION_SECRET="$(openssl rand -base64 32)"`. Commit `3ac82e2`.
 
 #### T23 — Auth API (register / login / logout / me) + admin bootstrap
 **Status:** ⬜ TODO · **Depends on:** T21, T22 · **Files:** `app/api/auth/{register,login,logout,me}/route.ts`, `lib/validation.ts`, `lib/types.ts`, `lib/auth.ts`
@@ -530,6 +531,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T17–T20 | Senior QA | Re-verification round 2: gates `npm test` 30/30 · lint clean · build green; API suite **197/197** (X1/X2 probes upgraded to hard assertions for both fixed defects) · lib checks all PASS (₱) · seed 12/12 + idempotent · real-browser 54/54 on dev server and 54/54 on the production Docker image · over-budget 3/3 · Docker in-container 15/15 + restart persistence. **BUG-QA-01/BUG-QA-02 verified fixed and closed.** DB wiped (0/0/0/0), dev server stopped, Docker artifacts removed. Details in §Senior QA. |
 | 2026-10-17 | PM | Project Manager | PM v2: added the **Phase 2 backlog (T21–T32)** — admin-approved accounts with per-account data (T21–T27), Overview **Wallet balance** (T28), **multi-select category filters** (T29), **UI polish + Night mode** (T30–T31), Phase 2 QA (T32). Superseded D2; new decisions D14–D21 (user answered Q4–Q7 the same day). Next up: **T21**. Housekeeping: repaired `node_modules/next` (left broken by an interrupted install — `npm install`) and verified the build. |
 | 2026-10-17 | T21 | Full-stack Developer | Auth data model: `User` (+ username/role/status/decidedAt) and `userId` FK/index on all four data models, `Category.name` → `@@unique([userId, name])`; migration `20261017044443_phase2_accounts` applied on the empty dev DB (5 tables, 0 users); gates green (30/30 tests) + fresh-DB end-to-end smoke 14/14; nullable-during-rollout call logged in §12 (**T26 tightens**). Commit `3070c50`. |
+| 2026-10-17 | T22 | Full-stack Developer | Auth core: `lib/auth.ts` — scrypt hashing (salted, timing-safe) + `st_session` HMAC-SHA256 tokens (30 d, httpOnly/Lax/Secure-in-prod; prod fails fast without `SESSION_SECRET`, dev fallback + warning) + async cookie helpers per the bundled Next 16 `cookies()` docs; 13 unit tests (tamper/expiry/wrong-secret/malformed). Gates 43/43 · lint · build green; `.env.example` + README (`SESSION_SECRET` row + Docker `-e` note). Commit `3ac82e2`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -779,6 +781,16 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
   - Dev-server smoke on the migrated empty DB: `/` 200 · `/api/categories` `[]` · POST 2 categories / income 100.00 / expense 5.00 / deposit 3.00 → `/api/overview?month=2026-10` reconciles `income 10000 · unallocated 8000 · spent 500 · netSaved 300 · balance 300` · all deletes 204 · **14/14 checks**, server log clean; DB restored to `0 users / 0/0/0/0`.
 - **Non-goal note:** no route/UI/README changes — the app behaves exactly as before until T26 scopes routes (new rows are written with a NULL owner).
 - **Acceptance criteria (§8 T21):** ✅ migration applies cleanly on the current DB · ✅ build/lint green (+ tests 30/30) · ✅ fresh start has no user rows.
+
+### T22 — Auth core library ✅
+- **Commit:** `3ac82e2 T22: auth core library (scrypt hashes + signed session tokens)`
+- **Files:** `lib/auth.ts`, `lib/auth.test.ts`, `.env.example`, `README.md`.
+- **API:** `hashPassword` / `verifyPassword` (scrypt, random 16-byte salt, `scrypt$<salt>$<hash>` b64url, timing-safe compare; malformed stored hash → `false`, no throw); `createSessionToken(userId, nowMs?)` / `verifySessionToken(token, nowMs?)` (`<payload b64url>.<hmac b64url>`, payload `{ uid, exp }`, HMAC-SHA256, TTL 30 d — expired/tampered/wrong-secret/malformed → `null`); `setSessionCookie` / `clearSessionCookie` (async `cookies()` per the bundled Next 16 docs; httpOnly, `SameSite=Lax`, path `/`, `Secure` in production, `maxAge` 30 d); `getSessionSecret()` (env as-is; **production missing → throws**; dev/test → fixed fallback + one-time `console.warn`); `SESSION_COOKIE_NAME` / `SESSION_TTL_SECONDS` exported.
+- **Tests (`lib/auth.test.ts`, 13/13):** hash ≠ password + `scrypt$…` shape; verify true/false (incl. empty/case-shifted); same password twice → different hashes, both valid; malformed stored hashes → false; token round-trip; tampered signature; tampered payload under a valid signature; expiry boundary (valid at `exp−1 s`, invalid at `exp`); 31-day-old token; wrong `SESSION_SECRET`; malformed tokens (`abc`, `abc.`, `.def`, `a.b.c`, null/undefined); dev-fallback round-trip; production fail-fast (`NODE_ENV` flipped via a typed helper — the `tsc` pass in `next build` caught the direct read-only write).
+- **Config/docs:** `.env.example` gains `SESSION_SECRET` (+ `openssl rand -base64 32` hint); README config-table row + Docker example `-e SESSION_SECRET="$(openssl rand -base64 32)"` with a note that changing the value signs everyone out.
+- **Evidence:** `npm test` **43/43** (5 files) · `npm run lint` clean · `npm run build` green (13/13; type-check included the new files).
+- **Non-goal note:** no routes/UI/DB changes — registration/login land in T23/T24.
+- **Acceptance criteria (§8 T22):** ✅ `npm test` green incl. the new file · ✅ lint/build green.
 
 ---
 
