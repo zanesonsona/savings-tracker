@@ -29,7 +29,10 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/categories
   }
   const { name, percentage, kind, color } = parsed.data;
 
-  const current = await prisma.category.findUnique({ where: { id } });
+  const current = await prisma.category.findUnique({
+    where: { id },
+    include: { _count: { select: { expenses: true, savingsEntries: true } } },
+  });
   if (!current) {
     return NextResponse.json({ error: "Category not found" }, { status: 404 });
   }
@@ -52,10 +55,26 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/categories
   if (percentage !== undefined) {
     const totalBp = others.reduce((sum, c) => sum + Math.round(c.percentage * 100), 0) +
       Math.round(percentage * 100);
-    if (totalBp > 10001) {
+    if (totalBp > 10000) {
       return NextResponse.json(
         { error: `Total allocation cannot exceed 100% (would be ${formatPercentBp(totalBp)}%)` },
         { status: 400 },
+      );
+    }
+  }
+
+  if (kind !== undefined && kind !== current.kind) {
+    // Changing kind would leave entries attached to a category of the wrong
+    // kind (breaks D8) and silently drops them from dashboard totals (BUG-QA-02).
+    const blockerCount =
+      current.kind === "EXPENSE" ? current._count.expenses : current._count.savingsEntries;
+    if (blockerCount > 0) {
+      const label = current.kind === "EXPENSE" ? "expense(s)" : "savings entry(ies)";
+      return NextResponse.json(
+        {
+          error: `Cannot change kind: this category has ${blockerCount} ${label} — delete them first`,
+        },
+        { status: 409 },
       );
     }
   }

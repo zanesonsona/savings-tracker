@@ -44,10 +44,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Σ% must stay ≤ 100.01 (basis-point integer math — §7 / D5).
+  // Σ% must stay ≤ 100.00 (basis-point integer math — D5; strict since BUG-QA-01).
   const totalBp = existing.reduce((sum, c) => sum + Math.round(c.percentage * 100), 0) +
     Math.round(percentage * 100);
-  if (totalBp > 10001) {
+  if (totalBp > 10000) {
     return NextResponse.json(
       { error: `Total allocation cannot exceed 100% (would be ${formatPercentBp(totalBp)}%)` },
       { status: 400 },
