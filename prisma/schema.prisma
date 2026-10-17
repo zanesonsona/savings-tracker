@@ -10,15 +10,42 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// --- Phase 2: accounts & per-account ownership (D14–D17) ---
+// Every data model belongs to exactly one User via `userId` (D16). During the
+// account rollout (T21–T26) the FK stays NULLABLE so the pre-auth API routes and
+// the DEV seed keep compiling and running while a fresh install has zero users
+// (D3/D15). The first Admin created by the bootstrap (T23/D15/D21) claims rows
+// with a NULL owner; T26 scopes all routes to the session account and tightens
+// these columns to required (`userId Int` — the §5 target).
+
+model User {
+  id             Int            @id @default(autoincrement())
+  username       String         @unique // compared case-insensitively in the API
+  passwordHash   String // scrypt (node:crypto) — D17
+  role           String         @default("USER") // "ADMIN" | "USER" (validated in API)
+  status         String         @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED" (validated in API)
+  createdAt      DateTime       @default(now())
+  decidedAt      DateTime?
+  categories     Category[]
+  incomes        Income[]
+  expenses       Expense[]
+  savingsEntries SavingsEntry[]
+}
+
 model Category {
   id             Int            @id @default(autoincrement())
-  name           String         @unique
+  name           String
   percentage     Float
   kind           String         @default("EXPENSE") // "EXPENSE" | "SAVINGS" (validated in API)
   color          String?
   createdAt      DateTime       @default(now())
+  userId         Int?
+  user           User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   expenses       Expense[]
   savingsEntries SavingsEntry[]
+
+  @@unique([userId, name])
+  @@index([userId])
 }
 
 model Income {
@@ -28,8 +55,11 @@ model Income {
   date        DateTime // UTC midnight
   note        String?
   createdAt   DateTime @default(now())
+  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([date])
+  @@index([userId])
 }
 
 model Expense {
@@ -40,9 +70,12 @@ model Expense {
   categoryId  Int
   category    Category @relation(fields: [categoryId], references: [id])
   createdAt   DateTime @default(now())
+  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([date])
   @@index([categoryId])
+  @@index([userId])
 }
 
 model SavingsEntry {
@@ -54,7 +87,10 @@ model SavingsEntry {
   categoryId  Int
   category    Category @relation(fields: [categoryId], references: [id])
   createdAt   DateTime @default(now())
+  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([date])
   @@index([categoryId])
+  @@index([userId])
 }
