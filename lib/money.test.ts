@@ -35,14 +35,14 @@ describe("toCents", () => {
 });
 
 describe("formatCents", () => {
-  it("formats USD amounts", () => {
-    expect(formatCents(123456)).toBe("$1,234.56");
-    expect(formatCents(1)).toBe("$0.01");
-    expect(formatCents(0)).toBe("$0.00");
-    expect(formatCents(100000000)).toBe("$1,000,000.00");
+  it("formats PHP amounts", () => {
+    expect(formatCents(123456)).toBe("₱1,234.56");
+    expect(formatCents(1)).toBe("₱0.01");
+    expect(formatCents(0)).toBe("₱0.00");
+    expect(formatCents(100000000)).toBe("₱1,000,000.00");
   });
 
   it("formats negative amounts", () => {
-    expect(formatCents(-800)).toBe("-$8.00");
+    expect(formatCents(-800)).toBe("-₱8.00");
   });
 });

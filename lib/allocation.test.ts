@@ -23,7 +23,7 @@ describe("splitIncome (largest remainder, §7)", () => {
     expect(result.unallocatedCents).toBe(2000);
   });
 
-  it("acceptance: 500000¢ ($5000.00) @ 35/25/20/20 → 175000/125000/100000/100000", () => {
+  it("acceptance: 500000¢ (₱5000.00) @ 35/25/20/20 → 175000/125000/100000/100000", () => {
     const result = splitIncome(500000, cats(35, 25, 20, 20));
     expect(result.allocations.map((a) => a.amountCents)).toEqual([175000, 125000, 100000, 100000]);
     expect(result.unallocatedCents).toBe(0);
