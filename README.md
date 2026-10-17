@@ -361,6 +361,7 @@ docker run --rm -p 3000:3000 \
 
 - Multi-stage image built on Next.js **standalone output**; the container applies pending Prisma migrations automatically on startup and runs as the non-root `node` user.
 - The SQLite database is created at `/app/data/dev.db` **inside the container** (override with the `DATABASE_URL` env var); the `savings-data` volume keeps it across restarts and upgrades. A fresh volume starts **empty** — register the first account (it becomes the admin), then create your categories.
+- **Page-redirect note (T33/BUG-QA-05):** in production builds, page-level `redirect()`s (e.g. a signed-in visitor opening `/login`, or a revoked session opening an app page) can arrive as `200` + a client-executed `NEXT_REDIRECT` instead of a hard `307` — the fork's postponed/prerender streaming flushes the shell first. The responses are `no-store`, contain **no protected content**, and browsers still land on the target route; the dev server and all JSON APIs keep hard status codes. `/login` and `/register` also keep sessions out of URLs (`method="post"` fallback + submit disabled until hydration).
 - To reset the data: stop the container and run `docker volume rm savings-data`.
 
 ## Scripts

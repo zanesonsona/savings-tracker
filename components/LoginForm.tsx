@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useHydrated } from "@/lib/use-hydrated";
 
 const inputClass = "field w-full";
 
 /** Client sign-in form for `/login` (T24). Posts to `/api/auth/login`. */
 export default function LoginForm() {
-  const router = useRouter();
+  // T33 (BUG-QA-03): submit stays inert until hydration so a click while the
+  // scripts are still loading can never native-GET the form (credentials in
+  // the URL). The `method="post"` fallback below covers Enter-key submits too.
+  const hydrated = useHydrated();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -33,9 +36,13 @@ export default function LoginForm() {
         return;
       }
 
-      // Navigate to the dashboard; the app-group shell renders fresh for the
-      // new session (client-side navigation fetches the target route).
-      router.replace("/");
+      // Hard navigation on purpose (T33, BUG-QA-04): in production builds the
+      // client router cache can hold the signed-out `/` redirect payload (the
+      // login page's brand-link prefetch), which hijacked `router.replace("/")`
+      // and left the app on /login. `location.replace` forces a full document
+      // load that always follows the fresh session cookie (and drops the login
+      // page from the back history).
+      window.location.replace("/");
     } catch {
       setError("Network error — please try again");
       setSubmitting(false);
@@ -43,7 +50,7 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+    <form onSubmit={handleSubmit} className="space-y-4" method="post" noValidate>
       {error ? (
         <p role="alert" className="alert-danger">
           {error}
@@ -83,7 +90,7 @@ export default function LoginForm() {
 
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || !hydrated}
         className="btn-primary w-full"
       >
         {submitting ? "Signing in…" : "Sign in"}

@@ -17,7 +17,10 @@ export default function AuthCard({ title, subtitle, children }: AuthCardProps) {
   return (
     <div className="w-full max-w-sm">
       <p className="mb-4 text-center">
-        <Link href="/" className="text-lg font-semibold tracking-tight text-ink">
+        {/* prefetch={false} (T33, BUG-QA-04): while signed out `/` answers with a
+            redirect; prefetching it seeded the production router cache with a
+            stale payload that could hijack the post-login navigation. */}
+        <Link href="/" prefetch={false} className="text-lg font-semibold tracking-tight text-ink">
           Savings Tracker
         </Link>
       </p>

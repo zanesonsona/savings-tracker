@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useHydrated } from "@/lib/use-hydrated";
 
 const inputClass = "field w-full";
 
@@ -12,6 +13,9 @@ interface RegisterSuccess {
 
 /** Client registration form for `/register` (T24). Posts to `/api/auth/register`. */
 export default function RegisterForm() {
+  // T33 (BUG-QA-03): inert submit until hydration (see LoginForm) — a native
+  // GET submit would put username/password/confirm into the URL.
+  const hydrated = useHydrated();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -74,7 +78,7 @@ export default function RegisterForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+    <form onSubmit={handleSubmit} className="space-y-4" method="post" noValidate>
       {error ? (
         <p role="alert" className="alert-danger">
           {error}
@@ -133,7 +137,7 @@ export default function RegisterForm() {
 
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || !hydrated}
         className="btn-primary w-full"
       >
         {submitting ? "Creating account…" : "Create account"}
