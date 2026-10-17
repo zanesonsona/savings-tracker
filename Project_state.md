@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v2 (Phase 2 added) · **Next up:** T32 — Phase 2 QA / end-to-end verification (QA agent) · **Progress:** Phase 1: 20/20 ✅ (T01–T20) · Phase 2: 11/12 (T21–T31 ✅ · T32 ⬜)
+**Last updated:** 2026-10-17 · **Plan version:** PM v2 (Phase 2 added; T32 QA logged 3 defects → T33+) · **Next up:** T33 — fix the T32 QA defects (BUG-QA-04 prod sign-in landing, BUG-QA-05 triage, then BUG-QA-03 — repro + suggested specs in §Senior QA → Defect log) · **Progress:** Phase 1: 20/20 ✅ (T01–T20) · Phase 2: 12/12 ✅ (T21–T32)
 
 ### 1. Vision
 
@@ -494,10 +494,12 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 **Result (2026-10-17):** ✅ Tailwind v4 class-strategy variant wired via `@custom-variant dark (&:where(.dark, .dark *))`; the `.dark` block re-points every T30 token — page = darkest layer (`--surface-muted` slate-900), cards/nav one step up (slate-800), **inverted accent** (slate-100 chip + slate-900 text so primary buttons and the active nav pill keep maximum contrast), success/warning/danger pairs retuned to dark softs (300-level text on 900/950-level fills), and `color-scheme` flips light/dark so native controls (incl. the date pickers) follow. New `components/ThemeToggle.tsx`: Light/Dark/System segmented control (default **System**) in the nav and on both auth cards; preference persisted in `localStorage` under `st-theme`, exposed through a tiny external store + `useSyncExternalStore` (server snapshot `system` ⇒ hydration renders the server markup, no mismatch; the store also avoids the repo linter's ban on effect-`setState`) with a live `matchMedia` listener while System is active. **No-FOUC:** inline `THEME_SCRIPT` in the root layout `<head>` reads `st-theme` and sets the `dark` class + `data-theme` **before first paint** (check asserts the script precedes `<body>` in the SSR HTML); `<html>` declares `suppressHydrationWarning`, and the toggle re-applies the stored theme in `useLayoutEffect` so dev Strict-Mode remounts cannot strip the class (per the bundled "preventing flash before hydration" guide). Dark audit is variable-level — nav, cards, forms, chips/badges, progress bars, signed amounts, over-budget red, empty states and auth cards all flip with the token change — with a single variant use (`dark:shadow-none` on the auth card). README: feature bullet, walkthrough step 8, architecture map. Gates: **87/87** tests · lint/build/tsc green · **23/23** acceptance checks (CSS `.dark` block + a compiled `dark:` rule, head-script ordering, control on auth + nav, every screen 200); DB fresh-empty. Instant switching, persistence and FOUC-free reloads are browser-verified in the T32 pass. Commit `54609b9`.
 
 #### T32 — Phase 2 QA / end-to-end verification
-**Status:** ⬜ TODO · **Depends on:** T21–T31 · **Files:** this file (Work Log) + small fixes
+**Status:** ✅ DONE · **Depends on:** T21–T31 · **Files:** this file (Work Log + QA section) — no source changes (QA role boundary)
 - Mirror T16: flow matrix — register → approve → sign in per account; A/B isolation probes (lists, cross-account ids, overview); wallet reconciliation; multi-select filters; both themes; admin guards (non-admin 403, self-decide blocked, double-decide 409); session edge cases (tampered/expired cookie, logout); seed with the demo user; Docker image re-check incl. `SESSION_SECRET`.
 - Gates: `npm test`, `npm run lint`, `npm run build` + browser suite on the dev server and the production image; DB restored to fresh-empty afterwards; QA reports defects → PM queues fixes as T33+ (same convention as T17/T18).
 - **Acceptance criteria:** checklist logged with pass/fail; gates green; Work Log entry added; QA section updated by the QA agent.
+
+**Result (2026-10-17):** ✅ Round-3 independent verification on `105d39c` (full matrices + defect log in §Senior QA). Gates: **87/87 tests (9 files) · lint clean · build green (21/21)**. API suite **199/199** on dev and **199/199** against the production image (`192 PASS + 7 KNOWN-BUG` documenting the new BUG-QA-05). Real-browser suites (system Edge headless): dev **76/76 + 1 KNOWN-BUG (BUG-QA-03)** · image **75/75 + 2 KNOWN-BUG** — **BUG-QA-04 reproduced 4/4 in production** (after sign-in the app stays on `/login` until a manual reload; High). Seed verified end-to-end: demo admin `demo`/`demo12345`, counts 1/4/2/4/1, idempotent re-run, `NODE_ENV=production` refused with exit 1, API wallet **₱4,710.00** (= 6,200 − 490 − 1,000). Docker: `SESSION_SECRET` hard requirement (no-secret container fails login signing with **500** + the D17 fail-fast log; `/login` still 200), data survives `docker restart`, cookie flags `Secure; HttpOnly; SameSite=lax; Max-Age=2592000` confirmed. **Three defects logged → queued T33+:** BUG-QA-04 (High — prod sign-in stays on `/login`), BUG-QA-03 (Low–Med — pre-hydration submit leaks credentials into the URL, dev+prod), BUG-QA-05 (Low — prod page redirects are soft `200 + NEXT_REDIRECT`). Final state: dev DB **0/0/0/0**, dev server stopped, Docker container/bind-dir/image removed; QA scripts/reports/shots live outside the repo under `AppData\Local\Temp\opencode\` (`package.json` untouched — D11).
 
 ---
 
@@ -556,6 +558,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T29 | Full-stack Developer | Multi-select category filters (D19): `?categoryIds=` CSV (OR, empty = all, malformed → 400, unknown → nothing, per account) on Expenses + Savings GET; Savings month net follows the filter while `balanceCents` stays account-wide; shared `CategoryMultiSelect` toggle-chip component (All/Clear, colors, hint) on Expenses, Savings + Dashboard rows (client-side, cards unchanged). 5 unit + 3 tenancy tests added (87/87) + 27/27 curl checks; README endpoint docs + walkthrough; DB fresh-empty. Commit `1b6e8fc`. |
 | 2026-10-17 | T30 | Full-stack Developer | UI polish, no behavior change: semantic token layer in `globals.css` (CSS variables → `@theme inline` utilities + control/panel radii), every screen migrated off raw slate/white/red/green/amber utilities (370 replacements, 0 leftovers), shared `.btn-*`/`.field`/`.alert-*`/`.badge*` component classes replace duplicated constants, global `:focus-visible` ring; caught + fixed a `bg-danger-soft0` migration typo. 87/87 tests · lint/build/tsc green · 41/41 curl checks (built CSS carries the layer, SSR pages token-only, all screens 200); DB fresh-empty. Commit `79795e8`. |
 | 2026-10-17 | T31 | Full-stack Developer | Night mode: Tailwind v4 `@custom-variant dark` + `.dark` token overrides (layered surfaces, inverted accent, dark-tuned success/warning/danger, `color-scheme`); new `ThemeToggle` (nav + auth cards) persisting `st-theme` via `useSyncExternalStore` + live OS listener; no-FOUC inline `<head>` script (asserted before `<body>`), `suppressHydrationWarning`, pre-paint re-apply for dev remounts. 87/87 tests · lint/build/tsc green · 23/23 curl checks; README feature/walkthrough/map; DB fresh-empty. Commit `54609b9`. |
+| 2026-10-17 | T32 | Senior QA | Phase 2 E2E verification (round 3) on `105d39c`: gates 87/87 (9 files) · lint clean · build green (21/21); API suite 199/199 on dev and 199/199 (192 + 7 KNOWN-BUG=BUG-QA-05) on the production image; real-browser (system Edge headless) 76/76 dev (+1 KNOWN-BUG=Bug-QA-03) · 75/75 image (+2 KNOWN-BUG; BUG-QA-04 reproduced **4/4** — prod sign-in stays on `/login` until a reload); seed demo ₱4,710.00 + idempotent + production guard; Docker no-secret fail-fast (D17) + restart persistence + `Secure` cookie flags. **3 defects queued T33+** (BUG-QA-04 High · BUG-QA-03 Low–Med · BUG-QA-05 Low). DB wiped 0/0/0/0; dev server stopped; Docker artifacts removed; reports/scripts/screenshots in AppData; docs committed. |
 
 ### 12. Agent decision log (provisional)
 
@@ -602,6 +605,9 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T30 · **Only radii get custom variables (`--radius-control`/`--radius-panel`); spacing keeps Tailwind's native `--spacing`** · reason: the spec's "radii/spacing" is satisfied by Tailwind v4's built-in spacing token (every step derives from one `--spacing` value), so a parallel scale would create two sources of truth; radii had two visually meaningful buckets (controls vs panels) worth naming for the T31 audit.
 - 2026-10-17 · T31 · **Theme persistence stays in `localStorage` (`st-theme`), never a request cookie** · reason: the spec names localStorage, and a cookie would only help the server pre-render the theme — reading it in the root layout opts the entire app out of static prerendering (bundled flash guide); the inline head script gets the identical no-FOUC result without touching rendering strategy. The control's state lives in a `useSyncExternalStore`-backed store (server snapshot `system`) rather than effect-`setState`: hydration renders the server snapshot (mismatch-free) and the repo's react-compiler lint rule rejects synchronous `setState` inside effects.
 - 2026-10-17 · T31 · **Dark palette layers page-darkest / cards-one-step-up and inverts the accent** · reason: light mode's relational logic is "cards lighter than page"; dark keeps the same elevation reading (slate-900 page, slate-800 cards) with zero class changes, and an inverted accent (slate-100 surface + slate-900 text via `--on-accent`) keeps primary buttons and the active nav pill at maximum contrast instead of letting a near-black button disappear into the dark surfaces.
+- 2026-10-17 · T32 · Round-3 real defects are recorded as **xfail-style KNOWN-BUG entries** in the suites (browser `A13` → BUG-QA-03, browser `G2` → BUG-QA-04, API `P7`–`P20b` → BUG-QA-05) instead of hard failures · reason: the suites must stay green and repeatable on both targets while still documenting every defect; a red suite masks new regressions, and QA is report-only — the defect log in §Senior QA carries repro + suggested specs for T33+.
+- 2026-10-17 · T32 · The Docker round runs against a **bind-mounted DB at `/home/zane/qa-t32-data`** (moved out of `/root`, which user `zane` cannot traverse) so the WSL-side `db-tool.ts` (the API suite's DB ops) and the container share one file · reason: the API suite needs direct DB manipulation (wipe / status / role / create+delete user) and `/root` is mode 0700 — unreachable for the suite's user; the container's `node` uid (1000) matches `zane`, so file ownership stays clean for both sides.
+- 2026-10-17 · T32 · BUG-QA-05 classified **Low + likely inherent to this fork's production streaming** rather than app code: production flushed/prerendered shells (headers `x-nextjs-prerender: 1`, `x-nextjs-postponed: 1`) mean a page-component `redirect()` arrives as 200 + a client-executed `NEXT_REDIRECT;…;307` in the body instead of a hard 307; probed with curl AND node-fetch, dev vs image, browser-like headers included — **no protected content in those bodies and `no-store`**, so no leak/UX impact · reason: keeps dev expectations strict (the API suite only tolerates the soft form under `QA_PROD=1` and still fails it in dev) while the image report stays meaningful; fix-or-document stays with the T33+ triage.
 
 ### 13. Open questions (for the human)
 
@@ -858,7 +864,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 ## Senior QA
 
-> Independent verification in two rounds against §8 acceptance criteria and PM decisions D1–D13. **Round 1** (T15 revision `2f4add3`): T16 ✅ DONE — two defects logged → T17/T18. **Round 2 (2026-10-17)** on the final revision (`5ecab99` T17/T18 + `2940322` T19 + `d0c4b3a` T20): **Q7–Q8 ✅ DONE — both defects verified fixed and closed; T19/T20 independently verified. No open items.** **Role boundary:** QA tests and reports only — no source changes, no dependencies added (`package.json` untouched — D11). Last updated: 2026-10-17.
+> Independent verification in three rounds against §8 acceptance criteria and PM decisions. **Round 1** (T15 `2f4add3`): T16 ✅ DONE — two defects → T17/T18. **Round 2** (`5ecab99` + `2940322` + `d0c4b3a`): both fixes re-verified and closed; T19/T20 verified — **Phase 1 fully green**. **Round 3 (2026-10-17)** on the Phase 2 revision `105d39c` (T21–T31): **T32 ✅ DONE — checklist logged, gates green, every Phase 2 acceptance criterion verified with independent evidence (API + real-browser suites on dev *and* the production image, seed, Docker/`SESSION_SECRET`). Three defects logged → queued T33+: BUG-QA-04 (High — prod sign-in stays on `/login` until a reload), BUG-QA-03 (Low–Med — pre-hydration submit leaks credentials into the URL), BUG-QA-05 (Low — prod page redirects are soft `200 + NEXT_REDIRECT` instead of 307).** **Role boundary:** QA tests and reports only — no source changes, no dependencies added (`package.json` untouched — D11). Last updated: 2026-10-17.
 
 ### QA task list
 
@@ -874,15 +880,23 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 | Q8 | Regression after T17/T18: gates + API suite + browser suite, DB wiped after | ✅ DONE — 30/30 · 197/197 · 54/54 (dev) · DB 0/0/0/0 |
 | Q9 | Verify T19 (PHP): UI texts, formatting lib, no USD leftovers, image chunks | ✅ DONE — ₱ in every suite; source scan clean; `PHP` in image chunks |
 | Q10 | Re-verify T20 Docker image: rebuild, boot, in-container guards, browser, persistence | ✅ DONE — 15/15 in-container · 54/54 browser on image · restart persistence |
+| Q11 | Phase 2 (§8 T21–T31): verify acceptance criteria on the built app | ✅ DONE — per-task matrix below (dev + production image) |
+| Q12 | Phase 2 edge cases: pre-hydration submits, isolation probes, negative wallet, filters, themes, session edge cases | ✅ DONE — edge-case table below |
+| Q13 | Gates: `npm test`, `npm run lint`, `npm run build` | ✅ DONE — 87/87 (9 files) · lint clean · build green (21/21) |
+| Q14 | Seed verification (demo admin, dataset, idempotent re-run, production guard) | ✅ DONE — counts 1/4/2/4/1 · re-run identical · guard exit 1 · API wallet ₱4,710.00 |
+| Q15 | Real-browser suites — dev server and the production Docker image | ✅ DONE — dev 76/76 (+1 known) · image 75/75 (+2 known) |
+| Q16 | Docker: `SESSION_SECRET` hard requirement, restart persistence, Secure cookie flags | ✅ DONE — no-secret login 500 + D17 fail-fast log · restart 200 · `Secure; HttpOnly; Lax` |
+| Q17 | Defect log with repro + suggested fixes → queued as T33+ | ✅ DONE — BUG-QA-03/04/05 below (BUG-QA-05 discovered by QA on the image) |
+| Q18 | Final state: DB wiped, dev server stopped, Docker artifacts removed | ✅ DONE — 0/0/0/0 · server stopped · container/bind-dir/image removed |
 
 ### Method & environment
 
-- **Revisions verified:** round 1 = `2f4add3` (T15); round 2 = `5ecab99` (T17/T18) + `2940322` (T19) + `d0c4b3a` (T20), docs `5145308`. QA made **no source changes** and added **no dependencies** (`package.json` untouched — D11).
-- **Environment:** WSL Debian · Node v24.22.0 · dev server `http://localhost:3000` · Prisma 6.19.3 · SQLite `prisma/dev.db` · Docker 26.1.5 (T20 re-verify; daemon operated as root).
-- **Tooling (outside the repo, under `C:\Users\sonso\AppData\Local\Temp\opencode\`):** `qa\` = API/lib/seed suites; `qa-web\` = real-browser suite using `playwright-core` + the installed **system Edge (headless)** plus the Docker check scripts — all evidence produced with zero repo dependencies.
-- **Data state:** every suite starts from and restores the empty DB (D3); final state 0 categories / 0 incomes / 0 expenses / 0 savings entries, dev server stopped, Docker container/volume/image removed.
+- **Revisions verified:** round 1 = `2f4add3` (T15); round 2 = `5ecab99` (T17/T18) + `2940322` (T19) + `d0c4b3a` (T20), docs `5145308`; round 3 = `105d39c` (T21–T31, Phase 2). QA made **no source changes** and added **no dependencies** (`package.json` untouched — D11).
+- **Environment:** WSL Debian · Node v24.22.0 · Prisma 6.19.3 · SQLite. Rounds 1–2: dev server only. **Round 3:** additionally the production artifact — image `savings-tracker:qa32` built from `105d39c`, `docker run -e SESSION_SECRET=… -p 3001:3000` with a bind-mounted DB at `/home/zane/qa-t32-data` (moved out of `/root` so the WSL-side DB tooling can reach it; container `node` uid = host `zane`), Docker 26.1.5 operated as root.
+- **Tooling (outside the repo, under `C:\Users\sonso\AppData\Local\Temp\opencode\`):** rounds 1–2: `qa\` + `qa-web\` (`playwright-core` + the installed **system Edge headless**). Round 3: `qa-p2\qa-p2-api.mjs` (199 checks; env overrides `QA_BASE`/`QA_SECRET`/`QA_DB_URL`/`QA_EXPECT_SECURE`/`QA_PROD`/`QA_REPORT`; DB ops via `qa-p2\db-tool.ts`) + `qa-p2\{docker-up,nosecret-test,seed-check,seed-api-check,persist-check,gates}.sh`; browser suite `qa-web\qa-p2-browser.mjs` (77 checks; `QA_BASE`/`QA_WIPE`/`QA_TAG`) + `probe-*` repro scripts for BUG-QA-04/05 — all evidence produced with zero repo dependencies.
+- **Data state:** every suite starts from/restores the empty DB (D3); round-3 final state: dev DB 0/0/0/0, dev server stopped, Docker container/bind-dir/image removed.
 
-### Results summary
+### Results summary — Phase 1 (rounds 1–2)
 
 | Gate | Result |
 |------|--------|
@@ -897,7 +911,21 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 | Real-browser suite — production image (:3001) | ✅ 54/54 PASS |
 | Docker restart persistence | ✅ marker category survived `docker restart`; cleanup verified empty |
 
-### T01–T20 acceptance matrix (updated after round 2)
+### Results summary — Phase 2 (round 3, T32 on `105d39c`)
+
+| Gate | Result |
+|------|--------|
+| `npm test` | ✅ **87/87 (9 files)** — wallet/money/dates/allocation/validation/auth + admin-users/categories/tenancy API suites |
+| `npm run lint` / `npm run build` | ✅ clean / ✅ green (21/21; all app routes ƒ Dynamic, `ƒ Proxy (Middleware)` listed) |
+| API suite — dev (:3000) | ✅ **199/199 PASS** (0 fail) |
+| API suite — production image (:3001) | ✅ **192 PASS + 7 KNOWN-BUG** (BUG-QA-05; 199 checks, 0 fail) |
+| Real-browser suite — dev (:3000) | ✅ **76 PASS / 0 FAIL / 1 KNOWN-BUG** (BUG-QA-03) |
+| Real-browser suite — production image (:3001) | ✅ **75 PASS / 0 FAIL / 2 KNOWN-BUG** (BUG-QA-03 · BUG-QA-04 **4/4**) |
+| Seed — fresh / idempotent / production guard | ✅ demo admin `demo`/`demo12345` · counts 1/4/2/4/1 · re-run identical · `NODE_ENV=production` → exit 1 (tables untouched); API overview wallet **₱4,710.00** (6,200 − 490 − 1,000) |
+| Docker — `SESSION_SECRET` hard requirement | ✅ no-secret container: `/login` 200, register 201, login of an existing user **500** + fail-fast log (D17); with secret → full flows green |
+| Docker — restart persistence + cookie flags | ✅ alice login 200 after `docker restart` (data survived); `Set-Cookie` = `Path=/; Max-Age=2592000; Secure; HttpOnly; SameSite=lax` on the image |
+
+### T01–T20 acceptance matrix (rounds 1–2)
 
 | Task | Verdict | Notes (independent evidence) |
 |------|---------|------------------------------|
@@ -921,6 +949,22 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 | T18 | ✅ | kind change with entries → 409; `spentCents` unchanged 21000; row stays attached; savings-side variant 409; safe kind change (no entries) 200 (API `X1.*` 12/12 PASS) |
 | T19 | ✅ | ₱1,234.56 everywhere (chips/cards/totals/negative/1¢) in real-browser runs on dev + image; lib checks ₱; no `USD`/`$` display left in `app/`, `components/`, `lib/`; `PHP` in image client chunks |
 | T20 | ✅ | `docker build` OK; fresh volume boots empty with migrations applied; non-root `node`; in-container T17/T18 guards 15/15; full browser suite 54/54 on the image; data survives `docker restart`; artifacts cleaned |
+
+### T21–T31 acceptance matrix (round 3 — `105d39c`)
+
+| Task | Verdict | Notes (independent evidence) |
+|------|---------|------------------------------|
+| T21 | ✅ | migration `20261017044443_phase2_accounts` on a fresh DB: 5 tables / 0 users; per-account names enforced (same name in two accounts 201 `SG6`; duplicate within one → 409 `SG7`); the nullable→claim window is closed since T26 (`userId` required) |
+| T22 | ✅ | the 13 `lib/auth.test.ts` tests are part of the green 87/87 run; production cookie flags incl. **Secure** (image `L5b` + raw login-header check); missing `SESSION_SECRET` in production fails fast (D17) |
+| T23 | ✅ | first register → ADMIN/APPROVED (`R6`), later → PENDING (`R10–R12`); pending/declined logins 403 with the exact messages (`L3`; browser `A3`/`A4`); 401 matrix for tampered/expired/unknown-uid/wrong-secret/malformed tokens (`P11–P17`); no `passwordHash` in any payload (`R6c`) |
+| T24 | ✅ | `/login` + `/register` render with mismatch guard + pending panel + sign-in link (browser `A5`/`A6`/`A6b`); signed-in redirects hard-307 on dev (`P7`/`P8`) — **prod serves them soft → BUG-QA-05** |
+| T25 | ✅ | proxy 307s signed-out on all six patterns (`S9–S14`; tampered `P12`); non-admin `/admin/users` → `/` (browser `D2`, API `P9`); logout re-locks (`C18`/`C18b`, `P21c`); Admin link admin-only (`C1c` vs `D1`); layout DB re-check + `instant = false`/`connection()` in place |
+| T26 | ✅ | accounts fully disjoint in the browser (`D3`/`D3b` — bob sees neither alice's ₱550 row nor her categories; fresh `F1`); cross-account ids → empty/404 (API `SG*` + 15 tenancy tests); overview isolated (`AD*`/`SG*` reconciliations) |
+| T27 | ✅ | UI approve/reject with live counts 2→1→0 pending · 4 approved · 2 declined + reject confirm dialog (`C4–C6b`); API guard order 404 → 400(self) → 400(admin) → 409 (`AD*`); non-admin 403; no hash leaks |
+| T28 | ✅ | wallet reconciles for every account shape: alice ₱4,250.00 (`C2d`), bob ₱1,600.00 (`D1b`), dave **−₱500.00 shown red** (`E1`/`E1b`), fresh ₱0.00 (`F1b`), seed ₱4,710.00; month-independence + live drift checks in the API suite |
+| T29 | ✅ | chips only for the right kind (`C7`, `C10b`); list + live total follow (`C8`), Clear restores (`C9`), savings month net follows while the balance stays all-time (`C11`/`C11b`), dashboard rows filter with cards unchanged (`C12`–`C12c`), income tab has no filter (`C3b`); malformed CSV → 400 (`V*`) |
+| T30 | ✅ | zero legacy palette utilities across all six screens (browser token audit `C15`–`C15f`); shared `.btn-*`/`.alert-*`/`.badge*` vocabulary renders; mobile 390×844 has no horizontal overflow (`C17`) |
+| T31 | ✅ | Light/Dark/System control on auth + nav (`A7`/`A7b`); dark applies + persists + no-FOUC head script precedes `<body>` (`A8`–`A12`, `C14`); system preference follows the OS live (`A10b`/`A10c`); dark bg genuinely dark (`C13b`) and light restores (`C14b`) |
 
 ### F1–F8 flows (§8 T16)
 
@@ -951,7 +995,36 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 | X6 expense with no income (allocated 0) | ✅ | remaining negative, progress 0 per spec, no crash |
 | X7 zero-category app | ✅ | full income unallocated, valid payload, no 500 |
 
-### Defect log (round 1 — both fixed in T17/T18 and re-verified in round 2)
+### Phase 2 flows (round 3 — T32)
+
+| Flow | Verdict | Evidence |
+|------|---------|----------|
+| P1 register → admin bootstrap → approve/reject → sign-in | ✅ | API `R6`/`R10–R12` + `AD*`; browser `A3–A6b`, `C4–C6b` (pending → approved signs in; rejected sees the declined message) |
+| P2 per-account isolation | ✅ | `D3`/`D3b` + 15 tenancy tests + cross-account id probes (404/empty, never a leak) |
+| P3 Wallet balance (all-time) | ✅ | `C2d` ₱4,250.00 · `D1b` ₱1,600.00 · `E1` −₱500.00 red · `F1b` ₱0.00 · seed ₱4,710.00; month switch leaves it unchanged |
+| P4 Multi-select filters (Expenses / Savings / Dashboard) | ✅ | `C7–C12c` + API CSV matrix (`V*`: OR, empty = all, unknown = none, malformed = 400, cross-account = empty) |
+| P5 Night mode + no-FOUC | ✅ | `A7–A12`, `C13–C14b` (incl. system-preference live reaction) |
+| P6 Sessions: tamper/expiry/logout + live status change | ✅ | API `P11–P22`; browser `C18`/`C18b`; non-revocation replay observation `P23` (by design D17) |
+| P7 Production image end-to-end | ✅ | browser 75/75 on `:3001`; Secure cookie flags; `docker restart` persistence; no-secret fail-fast |
+
+### Phase 2 edge cases (round 3 — extras beyond §8)
+
+| Case | Verdict | Evidence |
+|------|---------|----------|
+| Pre-hydration submit on `/login` + `/register` (credentials into URL) | ❌ **BUG-QA-03** | browser `A13` (xfail; dev + image): `/login?username=…&password=…` |
+| Client-side landing after sign-in (production builds) | ❌ **BUG-QA-04** | browser `G2` on the image: 4/4 logins stuck on `/login` until a reload; deterministic prefetch repro |
+| Page-component redirects in production | ⚠️ **BUG-QA-05** (Low) | API `P7/P8/P9/P14b/P18c/P19c/P20b` on the image: `200` + soft `NEXT_REDIRECT` (dev stays hard 307); no leaked content, responses `no-store` |
+| Zombie `<main>` after client-side login | ⚠️ obs | dev `C1d`: 2 `<main>` in the DOM, 1 visible (hidden previous route tree); a11y + `innerText` unaffected |
+| Route announcer vs `[role=alert]` locators | ⚠️ obs | `#__next-route-announcer__` echoes the page heading after navigation (`C4c`) — alert locators must scope by text |
+| Dev-only `instant` validation log noise | ⚠️ obs | the dev server logs `Could not validate "instant" … NEXT_REDIRECT` when the `(app)` layout redirects (log noise only; pages still 307, browser console clean) |
+| `Secure` cookie over plain `http://localhost` | ✅ | Edge accepts + replays it (image flows green) |
+| Credential replay after logout | ⚠️ obs | stateless HMAC tokens stay valid until expiry — by design D17 (`P23`) |
+| Mobile 390×844 | ✅ | no horizontal overflow (`C17`) |
+| Console hygiene | ✅ | `G1` clean on dev + image (only expected 4xx noise) |
+
+### Defect log
+
+#### Phase 1 (rounds 1–2 — both fixed and closed)
 
 #### BUG-QA-01 — Σ% guard allows 100.01% (D5 violation) → **T17**
 - **Severity:** High (money math breaks: allocations exceed income).
@@ -970,10 +1043,40 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Suggested fix:** count `expenses` / `savingsEntries` on kind change, return 409 if > 0 (full spec in T18).
 - **Status:** ✅ **FIXED in T18** (commit `5ecab99`) and **re-verified by QA 2026-10-17** — kind change with entries now 409 (`Cannot change kind … — delete them first`), `spentCents` unchanged (21000), row stays attached, kind stays EXPENSE; savings-side deposit variant also 409; entry-free kind change still 200. Guarded by API assertions `X1.kind-change-409`, `X1.spent-unchanged`, `X1.kind-unchanged`, `X1.savings-kind-change-409`.
 
+#### Phase 2 (round 3 — open, queued T33+)
+
+##### BUG-QA-03 — pre-hydration submit leaks credentials into the URL (dev + prod)
+- **Severity:** Low–Medium (credentials persisted in browser history / access logs; no auth bypass — the server still rejects them).
+- **Where:** `/login` + `/register` forms (`components/LoginForm.tsx` / `components/RegisterForm.tsx`): the submit handler exists only after hydration, so a click before that is a **native GET submit** of the form.
+- **Repro:** throttle `/_next/static/**` (+2.5 s), open `/login`, fill the fields and click “Sign in” before hydration → URL becomes `/login?username=alice&password=wrongpass1`; same on `/register` (`confirm` too) — reproduced on dev **and** the production image (browser check `A13`, recorded as KNOWN-BUG; the suite recovers by re-submitting after hydration).
+- **Expected:** credentials never appear in the URL; a pre-hydration click is inert or performs a safe POST.
+- **Suggested fix (T34):** disable the submit until hydrated (the repo already has the hydration-safe `useSyncExternalStore` pattern in `lib/use-today.ts`) or give the forms a native-safe fallback (`method="post"` → the page route 405s); then promote `A13` from xfail to a hard assertion.
+- **Status:** OPEN — queued as **T34** (PM to confirm numbering).
+
+##### BUG-QA-04 — production: sign-in keeps you on `/login` until a manual reload
+- **Severity:** High (the production image's primary flow appears broken; workaround = reload; dev is unaffected).
+- **Where:** the login form's client-side `router.replace("/")` + the signed-out `/login` page prefetching `/` (AuthCard brand link in `components/AuthCard.tsx`): the prefetch caches the signed-out `307 → /login` RSC payload, and the post-login navigation reuses that cache entry.
+- **Repro:** on the image (`:3001`), sign in with any account → the request completes but the app stays on `/login` (no error; loading ends, form clears); a manual reload lands on the dashboard. Browser suite `G2`: **4/4** UI logins needed the reload. Deterministic mechanism proof: `probe-prefetch.mjs` aborts only the first `/?_rsc=` prefetch → sign-in then lands by itself.
+- **Expected:** after sign-in the app lands on `/` without a reload.
+- **Suggested fix (T33):** navigate hard after sign-in (`window.location.assign("/")`), or `prefetch={false}` on the brand link, or perform the login through a server action that `redirect()`s; re-verify `G2` (currently xfail) on the image.
+- **Status:** OPEN — queued as **T33** (PM to confirm numbering).
+
+##### BUG-QA-05 — production: page-level redirects are soft (`200` + `NEXT_REDIRECT`) instead of `307`
+- **Severity:** Low (no user-facing impact — browsers execute the redirect client-side; no protected content in the soft response, verified with curl + node-fetch incl. browser-like headers; responses are `private, no-cache, no-store`).
+- **Where:** every server-component `redirect()` reached through page routes — signed-in `/login`/`/register` → `/` (T24), non-admin `/admin/users` → `/` (T25/T27), unknown/non-APPROVED/deleted session on `/` → `/login` (T25).
+- **Repro:** `curl -i` with a valid session: dev → `307 location: /`; image → `200` + `x-nextjs-prerender: 1` / `x-nextjs-postponed: 1`, body contains `NEXT_REDIRECT;replace;/;307;` (client-executed). API suite on the image: `P7/P8/P9/P14b/P18c/P19c/P20b` → recorded as KNOWN-BUG (dev stays hard-307, all PASS).
+- **Expected:** dev/prod parity (hard 307) or documented-as-behavior.
+- **Suggested fix (T33+ triage):** likely inherent to this fork's production postponed/prerender streaming (the shell flushes before `redirect()` resolves, so the status can no longer be 3xx); if hard redirects are needed, move the guards into `proxy.ts`/route handlers — otherwise document. The API suite tolerates the soft form only under `QA_PROD=1`.
+- **Status:** OPEN — queued for **T33+ triage**.
+
 ### Minor observations (non-blocking, not queued)
 
 - **O1** · `lib/use-today.ts` / `lib/use-current-month.ts` module-level cache never refreshes across midnight / month rollover while the tab stays open → the form's default date/month can be stale until reload. Optional later fix: invalidate the store on `visibilitychange`/timer.
 - **O2** · The client local-today default date vs the UTC month filter can disagree near month boundaries (e.g., shortly after local midnight on the 1st while UTC is still the previous month), so a fresh entry can land outside the visible month. Inherent to D13's UTC rule; UX nicety at most.
+- **O3** · After a client-side login the previous (auth) route tree stays in the DOM as a hidden `<main>` (dev `C1d`: 2 mains, 1 visible). `innerText`, a11y tree and box metrics ignore it — only raw DOM-count assertions are affected. Fork-specific kept-alive behavior; no action needed.
+- **O4** · `#__next-route-announcer__` (role=alert, 1px) echoes the current page heading after navigation (`C4c`) — `[role=alert]` locators must scope by text (the suites now do).
+- **O5** · Dev-only: the server log prints `Error: Route "/": Could not validate "instant" … NEXT_REDIRECT` whenever the `(app)` layout redirects a page request (an "instant validation" probe treats the redirect as a validation failure). User-visible behavior and the browser console are clean; log noise only.
+- **O6** · Repo hygiene: untracked 0-byte `nul` file in the repo root (a Windows `> nul` redirect artifact from QA tooling; flagged, deliberately left in place). Safe to delete before the next commit wave.
 
 ### Artifacts & how to re-run (all outside the repo, under `C:\Users\sonso\AppData\Local\Temp\opencode\`)
 
@@ -987,3 +1090,9 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 | Docker in-container checks + report | `qa-web\qa-t20-docker-checks.mjs` → `qa-web\qa-t20-docker-report.json` (15 PASS; image running on `:3001`) |
 | Docker persistence check | `qa-web\persist-create.mjs` → `docker restart qa-t20` → `qa-web\persist-check.mjs` |
 | Re-run (WSL) | start `npm run dev` in the repo, then e.g. `node /mnt/c/Users/sonso/AppData/Local/Temp/opencode/qa/qa-t16-api.mjs` (pass `wipe` to reset the DB first); browser suites need the dev server — or the Docker image via `qa-web\run-browser-docker.mjs` (port 3001) |
+| **R3 — API suite + reports** | `qa-p2\qa-p2-api.mjs` → `qa-p2\qa-p2-api-report.json` (dev **199 PASS**) · `qa-p2\qa-p2-api-report-docker.json` (image **192 PASS + 7 KNOWN-BUG**); DB ops via `qa-p2\db-tool.ts` (wipe / counts / users / set-status / set-role / create-user / delete-user; honors `DATABASE_URL`) |
+| **R3 — browser suite + reports + shots** | `qa-web\qa-p2-browser.mjs` → `qa-web\qa-p2-browser-report-dev.json` (**76 PASS + 1 KNOWN-BUG**) · `-docker.json` (**75 PASS + 2 KNOWN-BUG**) · screenshots in `qa-web\shots\`; env: `QA_BASE`, `QA_WIPE`, `QA_TAG` |
+| **R3 — defect repro probes** | BUG-QA-04: `qa-web\probe-prefetch.mjs` (deterministic) + `probe-docker-nav.mjs`/`probe-docker-login.mjs`; BUG-QA-05: `qa-p2\probe-redirects.sh` + `probe-redirects.mjs` + `probe-redirects3.sh` |
+| **R3 — docker + seed + gates scripts** | `qa-p2\docker-up.sh` (:3001; bind `/home/zane/qa-t32-data`) · `nosecret-test.sh` · `seed-check.sh` + `seed-api-check.sh` · `persist-check.sh` · `gates.sh` |
+| **R3 — re-run (dev)** | start the dev server, then `node /mnt/c/…/qa-p2/qa-p2-api.mjs`; browser: `cd …/qa-web && node qa-p2-browser.mjs` (self-wipes the dev DB; tags the report `dev`) |
+| **R3 — re-run (image)** | `wsl -u root -d Debian -- bash …/qa-p2/docker-up.sh` (fresh DB per run — the first registration becomes admin) → browser: `QA_BASE=http://localhost:3001 QA_WIPE=none QA_TAG=docker node qa-p2-browser.mjs` → `bash …/qa-p2/api-docker.sh` |
