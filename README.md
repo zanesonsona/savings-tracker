@@ -6,8 +6,9 @@ A local web app to plan and track your money: create an account, log your income
 - **Plan vs actual** — dashboard with allocated/actual/remaining per category, progress bars, and over-budget highlighting.
 - **Savings** — deposits/withdrawals on savings-kind categories with an all-time running balance (negative balances are allowed and shown in red).
 - **Wallet balance** — all-time cash on hand (income − spent − savings net) on the dashboard, next to the savings balance.
+- **Category filters** — multi-select, OR-combined toggle chips on the Expenses, Savings and Dashboard tabs; all-time balances and dashboard cards stay account-wide.
 - **Night mode** — Light / Dark / System switch in the nav (and on the sign-in/register cards), persisted in `localStorage` (`st-theme`) and applied by a tiny inline script before first paint — no flash on reload.
-- **Accounts with admin approval** — the first account becomes the admin; later registrations wait for approval, and every account only ever sees its own data. One SQLite file, no cloud.
+- **Accounts with admin approval** — the first account becomes the admin; later registrations wait for approval, and every account — the admin included — only ever sees its own data. One SQLite file, no cloud.
 - **Ships empty by design** — no preset users, categories, or demo data; the first account you register becomes the admin, then you create your own buckets.
 
 **Contents:** [Setup](#setup) · [Usage](#usage-first-run-walkthrough) · [Demo data](#optional-demo-data-dev-only) · [Configuration](#configuration) · [API reference](#api-reference) · [Docker](#run-with-docker) · [Scripts](#scripts) · [Architecture](#architecture-map) · [Testing](#testing)
@@ -17,10 +18,10 @@ A local web app to plan and track your money: create an account, log your income
 | Layer | Choice |
 |-------|--------|
 | Framework | Next.js 16 (App Router, TypeScript, Turbopack) |
-| Styling | Tailwind CSS v4 |
+| Styling | Tailwind CSS v4 (semantic token layer; light/dark themes) |
 | Database | SQLite via Prisma 6 (`@prisma/client`) |
 | Validation | zod (all API request bodies/params) |
-| Tests | vitest (money/allocation/date/auth helpers + route regression tests: category guards, session + per-account isolation, admin approvals) |
+| Tests | vitest (money/allocation/date/wallet/validation/auth helpers + route-level tests: category guards, session + per-account isolation, admin approvals) |
 
 ## Prerequisites
 
@@ -32,7 +33,7 @@ A local web app to plan and track your money: create an account, log your income
 
 ```bash
 npm install
-cp .env.example .env        # DATABASE_URL="file:./dev.db"  (PowerShell: Copy-Item .env.example .env)
+cp .env.example .env        # DATABASE_URL="file:./dev.db"; SESSION_SECRET optional in dev (PowerShell: Copy-Item .env.example .env)
 npm run db:migrate          # creates prisma/dev.db and applies migrations
 npm run dev                 # http://localhost:3000
 ```
@@ -95,16 +96,16 @@ Source-level configuration lives in `lib/constants.ts`:
 | Status | Meaning |
 |--------|---------|
 | `400` | Invalid JSON body, validation failure, Σ% would exceed 100, or wrong category kind for the entry type |
-| `401` | Missing/invalid session (`Authentication required`) |
+| `401` | Missing/invalid session (`Authentication required`); bad login credentials (`Invalid username or password`) |
 | `403` | Signed in but not allowed: `Account pending admin approval`, `This account registration was declined`, `Admin access required` |
 | `404` | Unknown id — including another account's id and an unknown `categoryId` |
-| `409` | Conflict: duplicate category name (per account), username already taken, category still in use, or blocked kind change |
+| `409` | Conflict: duplicate category name (per account), username already taken, category still in use, blocked kind change, or a registration that was already decided |
 
 Validation failures name the first offending field, e.g. `{ "error": "amountCents: Amount must be greater than zero" }`.
 
 ### Authentication
 
-Accounts are local (no email): **the first account ever registered becomes the app admin** (`ADMIN`/`APPROVED`); every later account is created as `USER`/`PENDING` and cannot sign in until an admin approves it (see [Admin](#admin-admin-only)). Sessions are a signed, httpOnly `st_session` cookie (HMAC-SHA256 with `SESSION_SECRET`, 30-day TTL); passwords are stored salted+hashed with `node:crypto` scrypt (`scrypt$salt$hash`) — never in plaintext.
+Accounts are local (no email): **the first account ever registered becomes the app admin** (`ADMIN`/`APPROVED`); every later account is created as `USER`/`PENDING` and cannot sign in until an admin approves it (see [Admin](#admin-admin-only)). Sessions are a signed, httpOnly `st_session` cookie (HMAC-SHA256 with `SESSION_SECRET`; `SameSite=Lax`, `Secure` in production; 30-day TTL) — the token is stateless, so signing out clears the cookie while an already-copied token stays valid until it expires. Passwords are stored salted+hashed with `node:crypto` scrypt (`scrypt$salt$hash`) — never in plaintext.
 
 **`POST /api/auth/register`** → `201 { user, message }`. Body: `username` (3–30 chars: letters, digits, `. _ -`) and `password` (≥ 8 chars). The first account gets `Admin account created — sign in to continue.`; later accounts get `Account created — an admin must approve it before you can sign in.` Neither path auto-logs-in, and the route never touches an existing session cookie. Errors: `400` validation; `409 Username "x" is already taken` (case-insensitive).
 
@@ -306,6 +307,7 @@ Field semantics:
 - `totals.spentCents` — Σ actuals of all expense-kind categories; `totals.netSavedCents` — month net of all savings-kind categories.
 - `walletBalanceCents` — **all-time** cash on hand (D18): all-time income − all-time expenses − savings net (deposits − withdrawals). Withdrawals return cash to the wallet; negative is allowed and shown red; independent of `month`.
 - `savingsBalanceCents` — all-time net across all savings categories (independent of `month`).
+- The dashboard's category chips filter the category rows **client-side**; summary cards and balances always stay account-wide.
 
 ### End-to-end example (curl)
 
@@ -361,7 +363,7 @@ docker run --rm -p 3000:3000 \
 
 - Multi-stage image built on Next.js **standalone output**; the container applies pending Prisma migrations automatically on startup and runs as the non-root `node` user.
 - The SQLite database is created at `/app/data/dev.db` **inside the container** (override with the `DATABASE_URL` env var); the `savings-data` volume keeps it across restarts and upgrades. A fresh volume starts **empty** — register the first account (it becomes the admin), then create your categories.
-- **Page-redirect note (T33/BUG-QA-05):** in production builds, page-level `redirect()`s (e.g. a signed-in visitor opening `/login`, or a revoked session opening an app page) can arrive as `200` + a client-executed `NEXT_REDIRECT` instead of a hard `307` — the fork's postponed/prerender streaming flushes the shell first. The responses are `no-store`, contain **no protected content**, and browsers still land on the target route; the dev server and all JSON APIs keep hard status codes. `/login` and `/register` also keep sessions out of URLs (`method="post"` fallback + submit disabled until hydration).
+- **Page-redirect note (T33/BUG-QA-05):** in production builds, page-level `redirect()`s (e.g. a signed-in visitor opening `/login`, or a stale session opening an app page) can arrive as `200` + a client-executed `NEXT_REDIRECT` instead of a hard `307` — the fork's postponed/prerender streaming flushes the shell first. The responses are `no-store`, contain **no protected content**, and browsers still land on the target route; the dev server and all JSON APIs keep hard status codes. `/login` and `/register` also keep credentials out of the URL (`method="post"` fallback + submit disabled until hydration).
 - To reset the data: stop the container and run `docker volume rm savings-data`.
 
 ## Scripts
@@ -382,6 +384,9 @@ docker run --rm -p 3000:3000 \
 
 ```
 app/
+  layout.tsx            root layout — metadata + the no-FOUC theme script
+  globals.css           T30/T31 token layer: semantic CSS variables, `.dark` overrides, shared component classes
+  icon.svg              app icon (tab favicon)
   (app)/                signed-in area (URLs unchanged; layout = Nav + secure session guard)
     layout.tsx          re-reads the session from the DB; missing/non-APPROVED → /login
     page.tsx            Dashboard (month picker, summary cards, per-category plan vs actual)
@@ -402,18 +407,20 @@ app/
     savings/            GET (?month=&categoryIds= → entries + balance + month net)/POST + DELETE [id]
     overview/           GET (?month=) → dashboard aggregation payload (session account only)
 proxy.ts                cookie-only optimistic redirects for app routes (Next 16 proxy; no DB)
-globals.css             T30/T31 token layer: semantic CSS variables, `.dark` overrides, shared component classes
 lib/
   auth.ts               scrypt password hashing, session token sign/verify, cookie helpers, requireUser/requireAdmin
   constants.ts          APP_CURRENCY / APP_LOCALE (money formatting switches)
   money.ts              integer-cent parsing/formatting (toCents/formatCents)
   allocation.ts         splitIncome — largest-remainder split, integer cents
+  wallet.ts             walletBalanceCents — all-time cash-on-hand formula (D18)
   dates.ts              UTC calendar-date helpers (parse/format month & day)
   validation.ts         zod schemas shared by all API routes
   types.ts              API DTO types + Prisma→DTO mappers
+  prisma.ts             PrismaClient singleton (survives dev hot-reload)
   api.ts                tiny fetch helper surfacing `{ error }` messages
   use-today.ts          client-only "today" (SSR-safe via useSyncExternalStore)
   use-current-month.ts  client-only "current month" (same pattern)
+  use-hydrated.ts       hydration flag — auth submits stay disabled until JS is ready (T33)
 components/
   AuthCard.tsx          centered card shell for the auth pages
   LoginForm.tsx         sign-in form (inline errors, loading state)
@@ -456,7 +463,7 @@ docker-entrypoint.sh    runs `prisma migrate deploy`, then the Next.js server
 ## Testing
 
 ```bash
-npm test                    # unit tests (money, allocation, dates, auth; route guards, two-account isolation + admin approvals)
+npm test                    # unit tests (money, allocation, dates, wallet, validation, auth; route guards, two-account isolation + admin approvals)
 npm run lint                # ESLint
 npm run build               # type-check + production build
 ```
