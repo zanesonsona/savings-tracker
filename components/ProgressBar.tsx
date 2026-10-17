@@ -3,9 +3,9 @@ export default function ProgressBar({ progress }: { progress: number }) {
   const over = progress > 1;
   const width = Math.max(0, Math.min(progress, 1)) * 100;
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
       <div
-        className={`h-full rounded-full ${over ? "bg-red-500" : "bg-slate-900"}`}
+        className={`h-full rounded-full ${over ? "bg-danger" : "bg-accent"}`}
         style={{ width: `${width}%` }}
       />
     </div>

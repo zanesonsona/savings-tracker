@@ -10,17 +10,13 @@ import type { CategoryDTO, SavingsListResponse } from "@/lib/types";
 import { useCurrentMonth } from "@/lib/use-current-month";
 import { useToday } from "@/lib/use-today";
 
-const INPUT_CLASS =
-  "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none";
+const INPUT_CLASS = "field";
 
-const BUTTON_PRIMARY =
-  "rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50";
+const BUTTON_PRIMARY = "btn-primary";
 
-const BUTTON_SECONDARY =
-  "rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
+const BUTTON_SECONDARY = "btn-secondary";
 
-const BUTTON_DANGER =
-  "rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50";
+const BUTTON_DANGER = "btn-danger";
 
 type Direction = "DEPOSIT" | "WITHDRAWAL";
 
@@ -153,37 +149,37 @@ export default function SavingsPage() {
   const monthNetCents = data?.monthNetCents ?? 0;
   const netClass =
     monthNetCents < 0
-      ? "font-medium text-red-600"
+      ? "font-medium text-danger"
       : monthNetCents > 0
-        ? "font-medium text-green-600"
-        : "font-medium text-slate-900";
+        ? "font-medium text-success"
+        : "font-medium text-ink";
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-900">Savings</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-2xl font-semibold text-ink">Savings</h1>
+        <p className="mt-1 text-sm text-ink-muted">
           Track deposits and withdrawals across your savings categories, filtered by month
           and categories.
         </p>
       </header>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
-        <h2 className="text-sm font-medium text-slate-500">Savings balance (all-time)</h2>
+      <section className="rounded-panel border border-line bg-surface p-6">
+        <h2 className="text-sm font-medium text-ink-muted">Savings balance (all-time)</h2>
         <p
           className={`mt-1 text-3xl font-semibold ${
-            balanceCents < 0 ? "text-red-600" : "text-slate-900"
+            balanceCents < 0 ? "text-danger" : "text-ink"
           }`}
         >
           {data ? formatCents(balanceCents) : "—"}
         </p>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           Net in {month ? monthLabel(month) : "…"}:{" "}
           {data ? <span className={netClass}>{formatCents(monthNetCents)}</span> : "—"}
         </p>
       </section>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center gap-3 rounded-panel border border-line bg-surface p-4">
         <button
           type="button"
           onClick={() => setMonthState(shiftMonth(month, -1))}
@@ -193,7 +189,7 @@ export default function SavingsPage() {
         >
           ← Prev
         </button>
-        <span className="min-w-40 text-center text-sm font-medium text-slate-900">
+        <span className="min-w-40 text-center text-sm font-medium text-ink">
           {month ? monthLabel(month) : "…"}
         </span>
         <button
@@ -213,13 +209,13 @@ export default function SavingsPage() {
         />
       </div>
 
-      <form onSubmit={handleCreate} className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-medium text-slate-900">Add savings entry</h2>
+      <form onSubmit={handleCreate} className="rounded-panel border border-line bg-surface p-4">
+        <h2 className="text-sm font-medium text-ink">Add savings entry</h2>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <div
             role="group"
             aria-label="Direction"
-            className="inline-flex overflow-hidden rounded-md border border-slate-300"
+            className="inline-flex overflow-hidden rounded-control border border-line"
           >
             <button
               type="button"
@@ -227,8 +223,8 @@ export default function SavingsPage() {
               aria-pressed={direction === "DEPOSIT"}
               className={`px-3 py-2 text-sm font-medium transition-colors ${
                 direction === "DEPOSIT"
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-700 hover:bg-slate-50"
+                  ? "bg-accent text-on-accent"
+                  : "bg-surface text-ink hover:bg-surface-muted"
               }`}
             >
               Deposit
@@ -237,10 +233,10 @@ export default function SavingsPage() {
               type="button"
               onClick={() => setDirection("WITHDRAWAL")}
               aria-pressed={direction === "WITHDRAWAL"}
-              className={`border-l border-slate-300 px-3 py-2 text-sm font-medium transition-colors ${
+              className={`border-l border-line px-3 py-2 text-sm font-medium transition-colors ${
                 direction === "WITHDRAWAL"
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-700 hover:bg-slate-50"
+                  ? "bg-accent text-on-accent"
+                  : "bg-surface text-ink hover:bg-surface-muted"
               }`}
             >
               Withdrawal
@@ -295,16 +291,16 @@ export default function SavingsPage() {
           className={`${INPUT_CLASS} mt-3 w-full`}
           aria-label="Note"
         />
-        {formError ? <p className="mt-2 text-sm text-red-600">{formError}</p> : null}
+        {formError ? <p className="mt-2 alert-danger">{formError}</p> : null}
       </form>
 
-      {actionError ? <p className="text-sm text-red-600">{actionError}</p> : null}
+      {actionError ? <p className="alert-danger">{actionError}</p> : null}
 
       {data === null ? (
         loadError ? (
-          <p className="text-sm text-red-600">{loadError}</p>
+          <p className="alert-danger">{loadError}</p>
         ) : (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-ink-muted">Loading…</p>
         )
       ) : data.entries.length === 0 ? (
         categories !== null && !hasSavingsCategories ? (
@@ -330,21 +326,21 @@ export default function SavingsPage() {
           />
         )
       ) : (
-        <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+        <ul className="divide-y divide-line rounded-panel border border-line bg-surface">
           {data.entries.map((entry) => (
             <li key={entry.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 p-4">
-              <span className="text-sm text-slate-500">{shortDate(entry.date)}</span>
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-900">
+              <span className="text-sm text-ink-muted">{shortDate(entry.date)}</span>
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink">
                 <span
                   className="h-2 w-2 rounded-full"
                   style={{ backgroundColor: entry.category.color ?? "#94a3b8" }}
                 />
                 {entry.category.name}
               </span>
-              {entry.note ? <span className="text-sm text-slate-400">{entry.note}</span> : null}
+              {entry.note ? <span className="text-sm text-ink-muted">{entry.note}</span> : null}
               <span
                 className={`ml-auto font-medium ${
-                  entry.direction === "DEPOSIT" ? "text-green-600" : "text-red-600"
+                  entry.direction === "DEPOSIT" ? "text-success" : "text-danger"
                 }`}
               >
                 {entry.direction === "DEPOSIT" ? "+" : "-"}

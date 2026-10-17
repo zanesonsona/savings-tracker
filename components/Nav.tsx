@@ -37,9 +37,9 @@ export default function Nav({ user }: { user: NavUser }) {
   }
 
   return (
-    <header className="border-b border-slate-200 bg-white">
+    <header className="border-b border-line bg-surface">
       <nav className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-        <Link href="/" className="text-lg font-semibold tracking-tight text-slate-900">
+        <Link href="/" className="text-lg font-semibold tracking-tight text-ink">
           Savings Tracker
         </Link>
         <div className="flex flex-wrap gap-1">
@@ -49,10 +49,10 @@ export default function Nav({ user }: { user: NavUser }) {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-control px-3 py-1.5 text-sm font-medium transition-colors ${
                   active
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-accent text-on-accent"
+                    : "text-ink-muted hover:bg-surface-muted hover:text-ink"
                 }`}
               >
                 {link.label}
@@ -61,12 +61,12 @@ export default function Nav({ user }: { user: NavUser }) {
           })}
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <span className="text-sm text-slate-600">{user.username}</span>
+          <span className="text-sm text-ink-muted">{user.username}</span>
           <button
             type="button"
             onClick={handleLogout}
             disabled={loggingOut}
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-control px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loggingOut ? "Logging out…" : "Log out"}
           </button>

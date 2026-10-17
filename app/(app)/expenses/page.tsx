@@ -10,17 +10,13 @@ import type { CategoryDTO, ExpenseDTO } from "@/lib/types";
 import { useCurrentMonth } from "@/lib/use-current-month";
 import { useToday } from "@/lib/use-today";
 
-const INPUT_CLASS =
-  "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none";
+const INPUT_CLASS = "field";
 
-const BUTTON_PRIMARY =
-  "rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50";
+const BUTTON_PRIMARY = "btn-primary";
 
-const BUTTON_SECONDARY =
-  "rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
+const BUTTON_SECONDARY = "btn-secondary";
 
-const BUTTON_DANGER =
-  "rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50";
+const BUTTON_DANGER = "btn-danger";
 
 /** "2026-10-05T00:00:00.000Z" → "Mon, Oct 5" (UTC parts — never shifts, D13). */
 function shortDate(iso: string): string {
@@ -187,13 +183,13 @@ export default function ExpensesPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-900">Expenses</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-2xl font-semibold text-ink">Expenses</h1>
+        <p className="mt-1 text-sm text-ink-muted">
           Log spending against your expense categories, filtered by month and categories.
         </p>
       </header>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center gap-3 rounded-panel border border-line bg-surface p-4">
         <button
           type="button"
           onClick={() => setMonthState(shiftMonth(month, -1))}
@@ -203,7 +199,7 @@ export default function ExpensesPage() {
         >
           ← Prev
         </button>
-        <span className="min-w-40 text-center text-sm font-medium text-slate-900">
+        <span className="min-w-40 text-center text-sm font-medium text-ink">
           {month ? monthLabel(month) : "…"}
         </span>
         <button
@@ -223,8 +219,8 @@ export default function ExpensesPage() {
         />
       </div>
 
-      <form onSubmit={handleCreate} className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-medium text-slate-900">Add expense</h2>
+      <form onSubmit={handleCreate} className="rounded-panel border border-line bg-surface p-4">
+        <h2 className="text-sm font-medium text-ink">Add expense</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-[9rem_1fr_10rem_auto]">
           <input
             value={amount}
@@ -275,37 +271,37 @@ export default function ExpensesPage() {
           className={`${INPUT_CLASS} mt-3 w-full`}
           aria-label="Note"
         />
-        {formError ? <p className="mt-2 text-sm text-red-600">{formError}</p> : null}
+        {formError ? <p className="mt-2 alert-danger">{formError}</p> : null}
       </form>
 
-      {actionError ? <p className="text-sm text-red-600">{actionError}</p> : null}
+      {actionError ? <p className="alert-danger">{actionError}</p> : null}
 
       {expenses === null ? (
         loadError ? (
-          <p className="text-sm text-red-600">{loadError}</p>
+          <p className="alert-danger">{loadError}</p>
         ) : (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-ink-muted">Loading…</p>
         )
       ) : expenses.length === 0 ? (
         emptyListState
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-muted">
             {expenses.length === 1 ? "1 expense" : `${expenses.length} expenses`} · Total{" "}
-            <span className="font-medium text-slate-900">{formatCents(listTotalCents)}</span>
+            <span className="font-medium text-ink">{formatCents(listTotalCents)}</span>
           </p>
           {groups.map((group) => (
             <section key={group.date}>
-              <h3 className="mb-1.5 text-xs font-medium tracking-wide text-slate-400 uppercase">
+              <h3 className="mb-1.5 text-xs font-medium tracking-wide text-ink-muted uppercase">
                 {shortDate(group.date)}
               </h3>
-              <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+              <ul className="divide-y divide-line rounded-panel border border-line bg-surface">
                 {group.items.map((expense) => (
                   <li
                     key={expense.id}
                     className="flex flex-wrap items-baseline gap-x-3 gap-y-1 p-4"
                   >
-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-900">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink">
                       <span
                         className="h-2 w-2 rounded-full"
                         style={{ backgroundColor: expense.category.color ?? "#94a3b8" }}
@@ -313,9 +309,9 @@ export default function ExpensesPage() {
                       {expense.category.name}
                     </span>
                     {expense.note ? (
-                      <span className="text-sm text-slate-400">{expense.note}</span>
+                      <span className="text-sm text-ink-muted">{expense.note}</span>
                     ) : null}
-                    <span className="ml-auto font-medium text-slate-900">
+                    <span className="ml-auto font-medium text-ink">
                       {formatCents(expense.amountCents)}
                     </span>
                     <button

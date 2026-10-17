@@ -10,14 +10,11 @@ import { formatCents, toCents } from "@/lib/money";
 import type { CategoryDTO, IncomeDTO } from "@/lib/types";
 import { useToday } from "@/lib/use-today";
 
-const INPUT_CLASS =
-  "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none";
+const INPUT_CLASS = "field";
 
-const BUTTON_PRIMARY =
-  "rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50";
+const BUTTON_PRIMARY = "btn-primary";
 
-const BUTTON_DANGER =
-  "rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50";
+const BUTTON_DANGER = "btn-danger";
 
 /** "2026-10-01T00:00:00.000Z" → "Oct 1" (UTC parts — never shifts, D13). */
 function shortDate(iso: string): string {
@@ -143,14 +140,14 @@ export default function IncomePage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-900">Income</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-2xl font-semibold text-ink">Income</h1>
+        <p className="mt-1 text-sm text-ink-muted">
           Log each paycheck — it is split across your categories by their percentages.
         </p>
       </header>
 
-      <form onSubmit={handleCreate} className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-medium text-slate-900">Add income</h2>
+      <form onSubmit={handleCreate} className="rounded-panel border border-line bg-surface p-4">
+        <h2 className="text-sm font-medium text-ink">Add income</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-[9rem_1fr_10rem_auto]">
           <input
             value={amount}
@@ -189,7 +186,7 @@ export default function IncomePage() {
           className={`${INPUT_CLASS} mt-3 w-full`}
           aria-label="Note"
         />
-        {formError ? <p className="mt-2 text-sm text-red-600">{formError}</p> : null}
+        {formError ? <p className="mt-2 alert-danger">{formError}</p> : null}
       </form>
 
       {!hasCategories && categories !== null ? (
@@ -201,13 +198,13 @@ export default function IncomePage() {
         />
       ) : null}
 
-      {actionError ? <p className="text-sm text-red-600">{actionError}</p> : null}
+      {actionError ? <p className="alert-danger">{actionError}</p> : null}
 
       {incomes === null ? (
         loadError ? (
-          <p className="text-sm text-red-600">{loadError}</p>
+          <p className="alert-danger">{loadError}</p>
         ) : (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-ink-muted">Loading…</p>
         )
       ) : incomes.length === 0 ? (
         <EmptyState
@@ -218,10 +215,10 @@ export default function IncomePage() {
         <div className="space-y-6">
           {groups.map((group) => (
             <section key={group.month}>
-              <h2 className="mb-2 text-sm font-medium text-slate-500">
+              <h2 className="mb-2 text-sm font-medium text-ink-muted">
                 {monthLabel(group.month)}
               </h2>
-              <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+              <ul className="divide-y divide-line rounded-panel border border-line bg-surface">
                 {group.items.map((income) => {
                   const split = splitIncome(
                     income.amountCents,
@@ -231,16 +228,16 @@ export default function IncomePage() {
                   return (
                     <li key={income.id} className="p-4">
                       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="text-sm font-medium text-slate-900">
+                        <span className="text-sm font-medium text-ink">
                           {shortDate(income.date)}
                         </span>
-                        <span className="text-sm text-slate-700">
+                        <span className="text-sm text-ink">
                           {income.source ?? "No source"}
                         </span>
                         {income.note ? (
-                          <span className="text-sm text-slate-400">{income.note}</span>
+                          <span className="text-sm text-ink-muted">{income.note}</span>
                         ) : null}
-                        <span className="ml-auto font-medium text-slate-900">
+                        <span className="ml-auto font-medium text-ink">
                           {formatCents(income.amountCents)}
                         </span>
                         <button
@@ -253,7 +250,7 @@ export default function IncomePage() {
                       </div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {!hasCategories ? (
-                          <Link href="/categories" className="text-xs text-slate-500 underline">
+                          <Link href="/categories" className="text-xs text-ink-muted underline">
                             Create categories to see the split
                           </Link>
                         ) : (
@@ -265,7 +262,7 @@ export default function IncomePage() {
                                 return (
                                   <span
                                     key={allocation.categoryId}
-                                    className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700"
+                                    className="badge badge-neutral gap-1.5"
                                   >
                                     <span
                                       className="h-2 w-2 rounded-full"
@@ -279,7 +276,7 @@ export default function IncomePage() {
                                 );
                               })}
                             {split.unallocatedCents > 0 ? (
-                              <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
+                              <span className="badge bg-line text-ink-muted">
                                 Unallocated {formatCents(split.unallocatedCents)}
                               </span>
                             ) : null}

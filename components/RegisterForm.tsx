@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-const inputClass =
-  "w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none";
+const inputClass = "field w-full";
 
 interface RegisterSuccess {
   message: string;
@@ -64,17 +63,10 @@ export default function RegisterForm() {
   if (success) {
     return (
       <div role="status" className="space-y-4">
-        <p
-          className={`rounded-md px-3 py-2 text-sm ${
-            success.isAdmin ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"
-          }`}
-        >
+        <p className={success.isAdmin ? "alert-success" : "alert-warning"}>
           {success.message}
         </p>
-        <Link
-          href="/login"
-          className="block w-full rounded-md bg-slate-900 px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-slate-700"
-        >
+        <Link href="/login" className="btn-primary w-full">
           Go to sign in
         </Link>
       </div>
@@ -84,13 +76,13 @@ export default function RegisterForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
       {error ? (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" className="alert-danger">
           {error}
         </p>
       ) : null}
 
       <div className="space-y-1">
-        <label htmlFor="username" className="block text-sm font-medium text-slate-700">
+        <label htmlFor="username" className="block text-sm font-medium text-ink">
           Username
         </label>
         <input
@@ -103,13 +95,13 @@ export default function RegisterForm() {
           onChange={(event) => setUsername(event.target.value)}
           className={inputClass}
         />
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-ink-muted">
           3–30 characters: letters, digits, dots, underscores and hyphens.
         </p>
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+        <label htmlFor="password" className="block text-sm font-medium text-ink">
           Password
         </label>
         <input
@@ -121,11 +113,11 @@ export default function RegisterForm() {
           onChange={(event) => setPassword(event.target.value)}
           className={inputClass}
         />
-        <p className="text-xs text-slate-500">At least 8 characters.</p>
+        <p className="text-xs text-ink-muted">At least 8 characters.</p>
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="confirm" className="block text-sm font-medium text-slate-700">
+        <label htmlFor="confirm" className="block text-sm font-medium text-ink">
           Confirm password
         </label>
         <input
@@ -142,14 +134,14 @@ export default function RegisterForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+        className="btn-primary w-full"
       >
         {submitting ? "Creating account…" : "Create account"}
       </button>
 
-      <p className="text-center text-sm text-slate-500">
+      <p className="text-center text-sm text-ink-muted">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-slate-900 underline underline-offset-2">
+        <Link href="/login" className="font-medium text-ink underline underline-offset-2">
           Sign in
         </Link>
       </p>

@@ -7,9 +7,9 @@ import { formatDate } from "@/lib/dates";
 import type { UserDTO, UserStatus } from "@/lib/types";
 
 const STATUS_BADGE: Record<UserStatus, string> = {
-  PENDING: "bg-amber-100 text-amber-800",
-  APPROVED: "bg-emerald-100 text-emerald-800",
-  REJECTED: "bg-red-100 text-red-700",
+  PENDING: "badge-warning",
+  APPROVED: "badge-success",
+  REJECTED: "badge-danger",
 };
 
 const STATUS_LABEL: Record<UserStatus, string> = {
@@ -18,11 +18,9 @@ const STATUS_LABEL: Record<UserStatus, string> = {
   REJECTED: "Declined",
 };
 
-const BUTTON_PRIMARY =
-  "rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50";
+const BUTTON_PRIMARY = "btn-primary";
 
-const BUTTON_DANGER =
-  "rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50";
+const BUTTON_DANGER = "btn-danger";
 
 /** ISO timestamp → "YYYY-MM-DD" (UTC, same convention as entry dates). */
 const day = (iso: string) => formatDate(new Date(iso));
@@ -30,17 +28,13 @@ const day = (iso: string) => formatDate(new Date(iso));
 function MemberRow({ user, currentUserId }: { user: UserDTO; currentUserId: number }) {
   return (
     <li className="flex flex-wrap items-center gap-3 p-4">
-      <span className="font-medium text-slate-900">{user.username}</span>
-      {user.id === currentUserId ? <span className="text-xs text-slate-400">(you)</span> : null}
-      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[user.status]}`}>
+      <span className="font-medium text-ink">{user.username}</span>
+      {user.id === currentUserId ? <span className="text-xs text-ink-muted">(you)</span> : null}
+      <span className={`badge ${STATUS_BADGE[user.status]}`}>
         {STATUS_LABEL[user.status]}
       </span>
-      {user.role === "ADMIN" ? (
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-          Admin
-        </span>
-      ) : null}
-      <span className="text-sm text-slate-400">
+      {user.role === "ADMIN" ? <span className="badge badge-neutral">Admin</span> : null}
+      <span className="text-sm text-ink-muted">
         registered {day(user.createdAt)}
         {user.decidedAt ? ` · decided ${day(user.decidedAt)}` : ""}
       </span>
@@ -108,48 +102,44 @@ export default function AdminUsers({ currentUserId }: { currentUserId: number })
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">User management</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-semibold text-ink">User management</h1>
+          <p className="mt-1 text-sm text-ink-muted">
             Approve new registrations and review all members.
           </p>
         </div>
         {users ? (
-          <div className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600">
-            <span className="font-medium text-amber-700">{pending.length}</span> pending ·{" "}
-            <span className="font-medium text-emerald-700">{approved.length}</span> approved ·{" "}
-            <span className="font-medium text-red-600">{rejected.length}</span> declined
+          <div className="rounded-control border border-line bg-surface px-3 py-1.5 text-sm text-ink-muted">
+            <span className="font-medium text-warning">{pending.length}</span> pending ·{" "}
+            <span className="font-medium text-success">{approved.length}</span> approved ·{" "}
+            <span className="font-medium text-danger">{rejected.length}</span> declined
           </div>
         ) : null}
       </header>
 
-      {actionError ? <p className="text-sm text-red-600">{actionError}</p> : null}
+      {actionError ? <p className="alert-danger">{actionError}</p> : null}
 
       {users === null ? (
         loadError ? (
-          <p className="text-sm text-red-600">{loadError}</p>
+          <p className="alert-danger">{loadError}</p>
         ) : (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-ink-muted">Loading…</p>
         )
       ) : (
         <>
           <section className="space-y-3">
-            <h2 className="text-sm font-medium text-slate-900">Pending registrations</h2>
+            <h2 className="text-sm font-medium text-ink">Pending registrations</h2>
             {pending.length === 0 ? (
               <EmptyState
                 title="No pending registrations"
                 description="New sign-ups will appear here for approval."
               />
             ) : (
-              <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+              <ul className="divide-y divide-line rounded-panel border border-line bg-surface">
                 {pending.map((user) => (
                   <li key={user.id} className="flex flex-wrap items-center gap-3 p-4">
-                    <span className="font-medium text-slate-900">{user.username}</span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE.PENDING}`}
-                    >
-                      Pending
-                    </span>
-                    <span className="text-sm text-slate-400">
+                    <span className="font-medium text-ink">{user.username}</span>
+                    <span className={`badge ${STATUS_BADGE.PENDING}`}>Pending</span>
+                    <span className="text-sm text-ink-muted">
                       registered {day(user.createdAt)}
                     </span>
                     <span className="ml-auto flex gap-2">
@@ -180,14 +170,14 @@ export default function AdminUsers({ currentUserId }: { currentUserId: number })
             const members = status === "APPROVED" ? approved : rejected;
             return (
               <section key={status} className="space-y-3">
-                <h2 className="text-sm font-medium text-slate-900">
+                <h2 className="text-sm font-medium text-ink">
                   {STATUS_LABEL[status]}{" "}
-                  <span className="font-normal text-slate-400">({members.length})</span>
+                  <span className="font-normal text-ink-muted">({members.length})</span>
                 </h2>
                 {members.length === 0 ? (
-                  <p className="text-sm text-slate-400">None yet.</p>
+                  <p className="text-sm text-ink-muted">None yet.</p>
                 ) : (
-                  <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+                  <ul className="divide-y divide-line rounded-panel border border-line bg-surface">
                     {members.map((user) => (
                       <MemberRow key={user.id} user={user} currentUserId={currentUserId} />
                     ))}

@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-const inputClass =
-  "w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none";
+const inputClass = "field w-full";
 
 /** Client sign-in form for `/login` (T24). Posts to `/api/auth/login`. */
 export default function LoginForm() {
@@ -46,13 +45,13 @@ export default function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
       {error ? (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" className="alert-danger">
           {error}
         </p>
       ) : null}
 
       <div className="space-y-1">
-        <label htmlFor="username" className="block text-sm font-medium text-slate-700">
+        <label htmlFor="username" className="block text-sm font-medium text-ink">
           Username
         </label>
         <input
@@ -68,7 +67,7 @@ export default function LoginForm() {
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+        <label htmlFor="password" className="block text-sm font-medium text-ink">
           Password
         </label>
         <input
@@ -85,14 +84,14 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+        className="btn-primary w-full"
       >
         {submitting ? "Signing in…" : "Sign in"}
       </button>
 
-      <p className="text-center text-sm text-slate-500">
+      <p className="text-center text-sm text-ink-muted">
         No account?{" "}
-        <Link href="/register" className="font-medium text-slate-900 underline underline-offset-2">
+        <Link href="/register" className="font-medium text-ink underline underline-offset-2">
           Create one
         </Link>
       </p>

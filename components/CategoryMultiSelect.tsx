@@ -35,17 +35,17 @@ export default function CategoryMultiSelect({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <span className="text-sm font-medium text-ink">{label}</span>
       {selected.length > 0 ? (
         <button
           type="button"
           onClick={() => onChange([])}
-          className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100"
+          className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-muted"
         >
           Clear
         </button>
       ) : (
-        <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
+        <span className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-on-accent">
           All
         </span>
       )}
@@ -59,8 +59,8 @@ export default function CategoryMultiSelect({
             aria-pressed={active}
             className={
               active
-                ? "rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white transition-colors"
-                : "rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                ? "rounded-full bg-accent px-3 py-1 text-xs font-medium text-on-accent transition-colors"
+                : "rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-ink transition-colors hover:bg-surface-muted"
             }
           >
             {option.color ? (
@@ -74,7 +74,7 @@ export default function CategoryMultiSelect({
           </button>
         );
       })}
-      {hint ? <span className="text-xs text-slate-400">{hint}</span> : null}
+      {hint ? <span className="text-xs text-ink-muted">{hint}</span> : null}
     </div>
   );
 }
