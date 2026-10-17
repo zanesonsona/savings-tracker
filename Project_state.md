@@ -6,7 +6,7 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-17 · **Plan version:** PM v2 (Phase 2 added) · **Next up:** T21 — Auth data model + migration (User + per-account ownership) · **Progress:** Phase 1: 20/20 ✅ (T01–T20) · Phase 2: 0/12 ⬜ (T21–T32)
+**Last updated:** 2026-10-17 · **Plan version:** PM v2 (Phase 2 added) · **Next up:** T22 — Auth core library (scrypt hashes + signed sessions) with unit tests · **Progress:** Phase 1: 20/20 ✅ (T01–T20) · Phase 2: 1/12 (T21 ✅ · T22–T32 ⬜)
 
 ### 1. Vision
 
@@ -389,14 +389,15 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 
 ### Phase 2 backlog — Accounts, Wallet, Filters & UX (T21–T32)
 
-> **Planned:** 2026-10-17 (PM v2; decisions D14–D21 confirmed with the user the same day). **Phase 1 is complete (T01–T20 ✅); Phase 2 is NOT started — begin with T21.** Same rule as above: never start a task whose dependencies are not ✅.
+> **Planned:** 2026-10-17 (PM v2; decisions D14–D21 confirmed with the user the same day). **Phase 1 is complete (T01–T20 ✅); Phase 2 is underway — T21 ✅, next is T22.** Same rule as above: never start a task whose dependencies are not ✅.
 
 #### T21 — Auth data model + migration (User + per-account ownership)
-**Status:** ⬜ TODO · **Depends on:** T20 ✅ · **Files:** `prisma/schema.prisma`, `prisma/migrations/*`
+**Status:** ✅ DONE · **Depends on:** T20 ✅ · **Files:** `prisma/schema.prisma`, `prisma/migrations/*`
 - Add the `User` model and the `userId` relations/indexes exactly as in §5's Phase-2 additions; `Category.name` changes from global `@unique` to `@@unique([userId, name])` (D16); `role`/`status` stay `String` columns validated by zod (SQLite — no enums, §4).
 - `npx prisma migrate dev --name phase2_accounts`; client regenerated; `npm run db:studio` shows 5 tables; the app still boots clean on an empty DB (0 users — D3/D15).
 - **Legacy dev data (D21):** the DB is empty today (QA left 0/0/0/0), so this is a no-op in practice. If a dev DB does hold rows, do **not** silently hand-edit: implement a safe sequence (e.g. nullable column → the first Admin claims those rows at bootstrap → tighten) and record the actual approach in §12.
 - **Acceptance criteria:** migration applies cleanly on the current DB; build/lint green; a fresh start has no user rows.
+- **Result (2026-10-17):** ✅ `User` model + per-account ownership landed; migration `20261017044443_phase2_accounts` applied cleanly on the (verified-empty) dev DB — SQLite table-redefine adds a **nullable** `userId` FK (`ON DELETE CASCADE`) + `@@index([userId])` to the four data models and swaps `Category.name` global unique → `@@unique([userId, name])`; 5 tables / 0 users confirmed via Prisma counts + `sqlite_master`/pragma probes; `npm test` 30/30 · lint clean · build green (13/13). Fresh-DB smoke: the full pre-auth flow still works end-to-end (overview reconciles `10000/8000/500/300/300`; deletes 204) and the DB is left fresh-empty. Commit `3070c50`. **Transition call (T21→T26 rollout — rationale in §12):** `userId` ships **nullable** — required fails `tsc` at the 5 pre-auth create sites (probe: 18 errors) and no user may exist before T23 (D3/D15); the first Admin claims NULL-owner rows (T23/D21) and **T26 tightens to required** (§5 target).
 
 #### T22 — Auth core library (scrypt hashes + signed sessions) with unit tests
 **Status:** ⬜ TODO · **Depends on:** T21 · **Files:** `lib/auth.ts`, `lib/auth.test.ts`, `.env.example`, `README.md`
@@ -443,6 +444,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 - API (ADMIN only → 403 otherwise; responses never include `passwordHash`): `GET /api/admin/users?status=PENDING|APPROVED|REJECTED|ALL`; `POST …/[id]/approve` and `…/[id]/reject` — `PENDING` only (already decided → **409** `Registration already decided`), unknown id → 404. Guards: an admin **cannot decide their own account**; an `ADMIN` can never be rejected here (no last-admin lockout).
 - UI `/admin/users`: pending registrations first (username, created date, Approve / Reject with a confirm on reject), then all members grouped by status; counts in the header; empty state “No pending registrations”; inline errors. Nav “Admin” link stays admin-only.
 - **Acceptance criteria (curl now, browser in T32):** register → appears PENDING → approve → that account can sign in; reject → sign-in shows the declined message; non-admin → 403/redirect; double-decide → 409; SSR checks pass.
+- *Note from T21 (2026-10-17): `userId` is currently **nullable** on all four data models; this multi-tenancy pass must also **tighten it to required** (`userId Int`, second migration) once every route writes `userId: session.user.id` — §5 target, rationale in §12.*
 
 #### T28 — Overall Wallet balance (API + dashboard card)
 **Status:** ⬜ TODO · **Depends on:** T26 · **Files:** `app/api/overview/route.ts`, `lib/*` + tests, `app/page.tsx`, `README.md`
@@ -527,6 +529,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T20 | Full-stack Developer | Docker support: multi-stage standalone image + isolated Prisma CLI stage, entrypoint `migrate deploy → node server.js`, absolute `/app/data/dev.db` + volume; `.dockerignore` + README. `docker build` + `docker run` verified end-to-end (migrate, CRUD, PHP bundle, restart persistence). Commit `d0c4b3a`. |
 | 2026-10-17 | T17–T20 | Senior QA | Re-verification round 2: gates `npm test` 30/30 · lint clean · build green; API suite **197/197** (X1/X2 probes upgraded to hard assertions for both fixed defects) · lib checks all PASS (₱) · seed 12/12 + idempotent · real-browser 54/54 on dev server and 54/54 on the production Docker image · over-budget 3/3 · Docker in-container 15/15 + restart persistence. **BUG-QA-01/BUG-QA-02 verified fixed and closed.** DB wiped (0/0/0/0), dev server stopped, Docker artifacts removed. Details in §Senior QA. |
 | 2026-10-17 | PM | Project Manager | PM v2: added the **Phase 2 backlog (T21–T32)** — admin-approved accounts with per-account data (T21–T27), Overview **Wallet balance** (T28), **multi-select category filters** (T29), **UI polish + Night mode** (T30–T31), Phase 2 QA (T32). Superseded D2; new decisions D14–D21 (user answered Q4–Q7 the same day). Next up: **T21**. Housekeeping: repaired `node_modules/next` (left broken by an interrupted install — `npm install`) and verified the build. |
+| 2026-10-17 | T21 | Full-stack Developer | Auth data model: `User` (+ username/role/status/decidedAt) and `userId` FK/index on all four data models, `Category.name` → `@@unique([userId, name])`; migration `20261017044443_phase2_accounts` applied on the empty dev DB (5 tables, 0 users); gates green (30/30 tests) + fresh-DB end-to-end smoke 14/14; nullable-during-rollout call logged in §12 (**T26 tightens**). Commit `3070c50`. |
 
 ### 12. Agent decision log (provisional)
 
@@ -561,6 +564,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - 2026-10-17 · T17/T18 · QA upgraded the API suite's X1/X2 sections from **observations to hard assertions** encoding the fixed behavior (400 / 409 / invariants) and re-ran every suite · reason: an observation documents a defect once; an assertion protects the fix against regressions forever.
 - 2026-10-17 · T19 · QA suite currency expectations switched `$` → `₱` via a scoped transform (only a `$` directly before a digit, plus one escaped regex literal) across the browser/over-budget/lib scripts · reason: keeps every display assertion meaningful after PHP instead of deleting them; `QA` scripts still live outside the repo, `package.json` untouched (D11).
 - 2026-10-17 · T20 · QA **re-built and re-ran the Docker image** (as root: `wsl -u root` — the daemon was already installed by the dev but user `zane` lacks the `docker` group): fresh-volume boot, in-container T17/T18 replays (15/15), the full browser suite against the production container (:3001, 54/54), restart persistence; container/volume/image removed after · reason: independent end-to-end evidence for the production artifact rather than trusting the dev's log.
+- 2026-10-17 · T21 · **`userId` shipped nullable** (optional `User` relation) on all four data models instead of §5's required target · reason: required `userId` fails `tsc` at the 5 pre-auth create sites — the categories/incomes/expenses/savings POSTs + the DEV seed, **18 errors in the kept probe** — and no user row can exist before T23 (D3/D15: fresh install = 0 users). This follows **D21's safe sequence**: nullable → the **first Admin claims** NULL-owner rows at bootstrap (T23) → **T26 tightens to required** once every route writes `userId: session.user.id`. Side benefit: the migration is also safe on a dev DB that still holds pre-account rows (the SQLite redefine copies them with a NULL owner — no reset needed). Transitional nuance: SQLite treats NULLs as distinct inside `@@unique([userId, name])`, so duplicate category names remain blocked only by the existing API check until T26 scopes names per account.
 
 ### 13. Open questions (for the human)
 
@@ -577,7 +581,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 
 ## Full-stack Developer
 
-> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T20 (QA defect fixes T17–T18 · PHP currency T19 · Docker T20).
+> Per-task implementation notes, maintained by the Full-stack Developer agent so QA can verify each task against §8. Last updated: 2026-10-17 · Completed: T21 (auth data model + migration — nullable `userId` transition, see §12).
 
 ### T01 — Scaffold Next.js app ✅
 - **Commit:** `ed21810 T01: scaffold Next.js app`
@@ -761,6 +765,20 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Verification evidence (real Docker daemon 26.1.5 in WSL):** `docker build` OK (~510 MB image). `docker run` with a named volume: log `Applying database migrations…` → migration `20261016160931_init` applied → `Starting Savings Tracker` → `Ready in 0ms`; `whoami` = `node`; fresh volume → `GET /api/categories` = `[]` HTTP 200 and `/` (dashboard) 200; 4 category POSTs → 201; **T17 repro in-image → 400** with the exact message; `"PHP"` present in built client chunks; `docker restart` with the same volume → the 4 categories still served (persistence). Test container + volume + image removed afterwards; host DB wiped to 0/0/0/0.
 - **Judgment call:** first runtime attempt failed with `Cannot find module 'effect'` (Prisma CLI transitive dep outside `@prisma/*`) → replaced piecemeal copying with the isolated, version-pinned CLI install stage; re-built and re-verified (see decision log).
 - **Acceptance criteria (§8 T20):** ✅ build OK; container migrates + serves; fresh volume empty (D3); data persists across restart; T17 + PHP active in the image.
+
+### T21 — Auth data model + migration ✅
+- **Commit:** `3070c50 T21: auth data model + migration (User + per-account ownership)`
+- **Files:** `prisma/schema.prisma`, `prisma/migrations/20261017044443_phase2_accounts/migration.sql`.
+- **Schema:** new `User` model per §5 (`id`, `username @unique`, `passwordHash`, `role @default("USER")`, `status @default("PENDING")`, `createdAt`, `decidedAt?`, reverse relations); each data model gains `userId Int?` + `user User? @relation(… onDelete: Cascade)` + `@@index([userId])`; `Category.name` global `@unique` → `@@unique([userId, name])` (D16). **Transitional detail:** `userId` is nullable for the T21→T26 rollout — required breaks `tsc` at the 5 pre-auth create sites (18-error probe) with no user to reference before T23; the first Admin claims NULL-owner rows (T23/D21) and **T26 tightens to required** (§5 target). A comment block in the schema documents this; full rationale in §12.
+- **Migration:** `npx prisma migrate dev --name phase2_accounts` → `20261017044443_phase2_accounts`; SQL: `CREATE TABLE "User"` + SQLite table-redefine of the four data models (row copy preserves a NULL owner → safe on non-empty DBs), new FKs (`ON DELETE CASCADE`), per-model `userId` indexes, composite `Category_userId_name_key`, `User_username_key`.
+- **Verification evidence:**
+  - `npx prisma migrate status` → 2 migrations · "Database schema is up to date!".
+  - DB probes: tables `Category · Expense · Income · SavingsEntry · User` (+ `_prisma_migrations`); counts `users 0 · 0/0/0/0` (fresh start = no users, D3/D15); `Category` indexes `Category_userId_idx` + `Category_userId_name_key`; `Income` FK → `User(id)` `ON DELETE CASCADE`; `User` columns `id, username, passwordHash, role, status, createdAt, decidedAt`.
+  - **Kept probe (why nullable):** with `userId Int` → `npx tsc --noEmit` = **18 errors / 5 files** (all at pre-auth create sites); with `Int?` → clean.
+  - Gates: `npm test` **30/30** (4 files) · `npm run lint` clean · `npm run build` green (13/13 pages; API routes ƒ Dynamic).
+  - Dev-server smoke on the migrated empty DB: `/` 200 · `/api/categories` `[]` · POST 2 categories / income 100.00 / expense 5.00 / deposit 3.00 → `/api/overview?month=2026-10` reconciles `income 10000 · unallocated 8000 · spent 500 · netSaved 300 · balance 300` · all deletes 204 · **14/14 checks**, server log clean; DB restored to `0 users / 0/0/0/0`.
+- **Non-goal note:** no route/UI/README changes — the app behaves exactly as before until T26 scopes routes (new rows are written with a NULL owner).
+- **Acceptance criteria (§8 T21):** ✅ migration applies cleanly on the current DB · ✅ build/lint green (+ tests 30/30) · ✅ fresh start has no user rows.
 
 ---
 
