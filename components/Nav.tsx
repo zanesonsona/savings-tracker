@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 
 const LINKS = [
   { href: "/", label: "Dashboard" },
@@ -11,8 +12,29 @@ const LINKS = [
   { href: "/categories", label: "Categories" },
 ] as const;
 
-export default function Nav() {
+interface NavUser {
+  username: string;
+  role: string;
+}
+
+/** Session-aware top navigation (T25): username, Admin link for admins, log out. */
+export default function Nav({ user }: { user: NavUser }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const links: { href: string; label: string }[] =
+    user.role === "ADMIN" ? [...LINKS, { href: "/admin/users", label: "Admin" }] : [...LINKS];
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.replace("/login");
+    } catch {
+      setLoggingOut(false);
+    }
+  }
 
   return (
     <header className="border-b border-slate-200 bg-white">
@@ -21,7 +43,7 @@ export default function Nav() {
           Savings Tracker
         </Link>
         <div className="flex flex-wrap gap-1">
-          {LINKS.map((link) => {
+          {links.map((link) => {
             const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
             return (
               <Link
@@ -37,6 +59,17 @@ export default function Nav() {
               </Link>
             );
           })}
+        </div>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <span className="text-sm text-slate-600">{user.username}</span>
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loggingOut ? "Logging out…" : "Log out"}
+          </button>
         </div>
       </nav>
     </header>
