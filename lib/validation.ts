@@ -158,3 +158,8 @@ export const loginSchema = z.object({
   username: z.string().trim().min(1, "Username is required").max(30, "Username must be 30 characters or fewer"),
   password: z.string().min(1, "Password is required"),
 });
+
+// --- Admin user management (T27) ---
+
+/** GET /api/admin/users?status= filter (the route defaults to ALL). */
+export const adminUsersStatusSchema = z.enum(["PENDING", "APPROVED", "REJECTED", "ALL"]);

@@ -18,7 +18,7 @@ A local web app to plan and track your money: create an account, log your income
 | Styling | Tailwind CSS v4 |
 | Database | SQLite via Prisma 6 (`@prisma/client`) |
 | Validation | zod (all API request bodies/params) |
-| Tests | vitest (money/allocation/date/auth helpers + route regression tests: category guards, session + per-account isolation) |
+| Tests | vitest (money/allocation/date/auth helpers + route regression tests: category guards, session + per-account isolation, admin approvals) |
 
 ## Prerequisites
 
@@ -39,7 +39,7 @@ The app starts **empty** (no users, no categories, no entries) — the first acc
 
 ## Usage (first run walkthrough)
 
-1. **Create an account** — open `/register`. The first account ever created becomes the app **admin** and is approved immediately; every later account lands as **pending** until an admin approves it at `/admin/users` (T27) — pending and declined accounts cannot sign in. Sign in at `/login`; the session lasts 30 days (httpOnly `st_session` cookie, signed with `SESSION_SECRET`). Each account only ever sees its own data — the admin included.
+1. **Create an account** — open `/register`. The first account ever created becomes the app **admin** and is approved immediately; every later account lands as **pending** until an admin approves it at `/admin/users` — pending and declined accounts cannot sign in. Sign in at `/login`; the session lasts 30 days (httpOnly `st_session` cookie, signed with `SESSION_SECRET`). Each account only ever sees its own data — the admin included.
 2. **Create your categories** — open `/categories` (or the onboarding link on the dashboard). For each category set a name, a kind (**Expense** for spending buckets, **Savings** for savings buckets), a percentage of income, and an optional color. The running total must stay at or below **100%** per account; anything below 100% shows as **Unallocated** and is assigned to no category.
 3. **Log income** — open `/income`. Enter an amount (e.g. `5000.00`), an optional source, a date, and an optional note. Every income row shows its computed split across your categories (plus an *Unallocated* chip when Σ% < 100%).
 4. **Log expenses** — open `/expenses`. Expenses can only be filed against Expense-kind categories. Filter by month and category; the list and live total follow the active filters.
@@ -101,7 +101,7 @@ Validation failures name the first offending field, e.g. `{ "error": "amountCent
 
 ### Authentication
 
-Accounts are local (no email): **the first account ever registered becomes the app admin** (`ADMIN`/`APPROVED`); every later account is created as `USER`/`PENDING` and cannot sign in until an admin approves it (approval UI: T27). Sessions are a signed, httpOnly `st_session` cookie (HMAC-SHA256 with `SESSION_SECRET`, 30-day TTL); passwords are stored salted+hashed with `node:crypto` scrypt (`scrypt$salt$hash`) — never in plaintext.
+Accounts are local (no email): **the first account ever registered becomes the app admin** (`ADMIN`/`APPROVED`); every later account is created as `USER`/`PENDING` and cannot sign in until an admin approves it (see [Admin](#admin-admin-only)). Sessions are a signed, httpOnly `st_session` cookie (HMAC-SHA256 with `SESSION_SECRET`, 30-day TTL); passwords are stored salted+hashed with `node:crypto` scrypt (`scrypt$salt$hash`) — never in plaintext.
 
 **`POST /api/auth/register`** → `201 { user, message }`. Body: `username` (3–30 chars: letters, digits, `. _ -`) and `password` (≥ 8 chars). The first account gets `Admin account created — sign in to continue.`; later accounts get `Account created — an admin must approve it before you can sign in.` Neither path auto-logs-in, and the route never touches an existing session cookie. Errors: `400` validation; `409 Username "x" is already taken` (case-insensitive).
 
@@ -110,6 +110,14 @@ Accounts are local (no email): **the first account ever registered becomes the a
 **`POST /api/auth/logout`** → `204` and clears the cookie (idempotent). **`GET /api/auth/me`** → `200 { user }` for the session account; `401 Authentication required` otherwise.
 
 `user` is always a `UserDTO`: `{ id, username, role, status, createdAt, decidedAt }` — the password hash is never returned.
+
+### Admin (ADMIN only)
+
+Managing registrations is restricted to `ADMIN` accounts; anyone else gets `403 Admin access required`.
+
+**`GET /api/admin/users?status=PENDING|APPROVED|REJECTED|ALL`** → `200 UserDTO[]` in registration order (default `ALL`; unknown status → `400`). The password hash is never included.
+
+**`POST /api/admin/users/[id]/approve`** → `200 { user }` (now `APPROVED`, `decidedAt` set). **`POST /api/admin/users/[id]/reject`** → `200 { user }` (now `REJECTED`). Guards on both: unknown id → `404 User not found`; only `PENDING` rows can be decided → `409 Registration already decided`; an admin cannot decide their own account → `400 You cannot decide your own account`; an ADMIN account can never be rejected → `400 Admin accounts cannot be rejected` (no last-admin lockout exists because admins are never rejected).
 
 ### Categories
 
@@ -375,12 +383,13 @@ app/
     expenses/page.tsx   Expenses with month + category filters
     savings/page.tsx    Savings balance, deposits/withdrawals history
     categories/page.tsx Create/edit/delete categories, Σ% indicator
-    admin/users/page.tsx Admin-only member list (T25 stub; real UI in T27)
+    admin/users/page.tsx Admin-only approvals + member list (pending first, grouped by status)
   (auth)/               signed-out chrome (centered card, no nav)
     login/page.tsx      Sign-in form
     register/page.tsx   Registration form (admin-vs-pending success states)
   api/
     auth/               register/login/logout/me (session cookie; first account = admin)
+    admin/users/        ADMIN-only: GET members (?status=) + POST [id]/{approve,reject}
     categories/         GET/POST + PATCH/DELETE [id]   (401 without session; per-account Σ% ≤ 100 + names)
     incomes/            GET (?month=)/POST + DELETE [id]
     expenses/           GET (?month=&categoryId=)/POST + DELETE [id]   (EXPENSE categories only)
@@ -437,7 +446,7 @@ docker-entrypoint.sh    runs `prisma migrate deploy`, then the Next.js server
 ## Testing
 
 ```bash
-npm test                    # unit tests (money, allocation, dates, auth; route guards + two-account isolation)
+npm test                    # unit tests (money, allocation, dates, auth; route guards, two-account isolation + admin approvals)
 npm run lint                # ESLint
 npm run build               # type-check + production build
 ```
