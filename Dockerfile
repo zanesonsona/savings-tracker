@@ -4,7 +4,7 @@
 # Run:   docker run --rm -p 3000:3000 -v savings-data:/app/data savings-tracker
 #
 # The SQLite database lives at /app/data/dev.db inside the container
-# (DATABASE_URL default below); mount a volume there to persist your data.
+# (DATABASE_URL default below); attach persistent storage there to keep your data.
 # Pending Prisma migrations are applied automatically on every start.
 
 # ---------- Stage 1: dependencies ----------
@@ -37,9 +37,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Absolute URL: dev.db is intentionally not copied into the image, and the
-# runtime database always lives under the /app/data volume. `prisma generate`
-# must run before `next build` so the client is traced into the standalone
-# output.
+# runtime database always lives under /app/data (persistent storage). `prisma
+# generate` must run before `next build` so the client is traced into the
+# standalone output.
 ENV DATABASE_URL="file:/app/data/dev.db"
 RUN npx prisma generate && npm run build
 
@@ -75,6 +75,9 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER node
 EXPOSE 3000
-VOLUME ["/app/data"]
+# NOTE: no storage-path declaration on purpose — Railway forbids it in
+# Dockerfiles. Attach persistence at runtime instead:
+#   local:   docker run ... -v savings-data:/app/data
+#   Railway: storage mount at /app/data
 
 ENTRYPOINT ["docker-entrypoint.sh"]

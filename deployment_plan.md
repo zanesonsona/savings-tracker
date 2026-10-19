@@ -21,7 +21,7 @@
 |---|---|
 | App | Next.js 16 (App Router) + TypeScript + Tailwind 4; Prisma 6 → **SQLite**. PHP currency display. |
 | Production artifact | **Docker image** (`Dockerfile`, multi-stage, Next `output: standalone`) — QA-verified. Runs as non-root `node`, listens on port 3000. |
-| Data | One SQLite file at **`/app/data/dev.db`** inside the container; `VOLUME /app/data` backed by Railway's persistent volume. |
+| Data | One SQLite file at **`/app/data/dev.db`** inside the container; persisted via a **Railway Volume mounted at `/app/data`** (attached at runtime — no Dockerfile `VOLUME`, which Railway bans during build validation). |
 | Startup | `docker-entrypoint.sh` applies `prisma migrate deploy` then starts the server — also creates the DB on first boot. |
 | Required env | **`SESSION_SECRET`** (production fails fast without it). `PORT=3000`, `HOSTNAME=0.0.0.0`, `DATABASE_URL=file:/app/data/dev.db` are baked into the image. |
 | Health probes | `GET /login` → 200 when signed out. `GET /` → 307 → `/login`. APIs → 401 without a session. |
@@ -126,7 +126,8 @@ Everything else is baked into the image. No Dockerfile changes, no compose file,
 |---|---|---|---|
 | 2026-10-19 | Gates re-run for deploy revision | ✅ 87/87 tests · lint clean · build OK | me |
 | 2026-10-19 | `SESSION_SECRET` generated + stored | ✅ `~/.savings-session-secret.txt` (chmod 600) | me |
-| 2026-10-19 | Plan v3 (Railway-only) written + committed | ✅ [[fill after commit]] | me |
+| 2026-10-19 | Plan v3 (Railway-only) written + committed | ✅ commit `60ab2e5` | me |
+| 2026-10-19 | First Railway build rejected — `VOLUME` keyword banned in Dockerfiles | ✅ removed from Dockerfile, pushed for rebuild | me |
 | | Phase R0 (user signup/click) | ⏳ waiting | you |
 | | Phase R2 (verification) | ⏳ | me |
 | | Phase R3 (admin claim) | ⏳ | you + me |
