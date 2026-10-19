@@ -128,6 +128,6 @@ Everything else is baked into the image. No Dockerfile changes, no compose file,
 | 2026-10-19 | `SESSION_SECRET` generated + stored | ✅ `~/.savings-session-secret.txt` (chmod 600) | me |
 | 2026-10-19 | Plan v3 (Railway-only) written + committed | ✅ commit `60ab2e5` | me |
 | 2026-10-19 | First Railway build rejected — `VOLUME` keyword banned in Dockerfiles | ✅ removed from Dockerfile, pushed for rebuild | me |
-| | Phase R0 (user signup/click) | ⏳ waiting | you |
-| | Phase R2 (verification) | ⏳ | me |
-| | Phase R3 (admin claim) | ⏳ | you + me |
+| 2026-10-19 | App live at `savings-tracker-production-e934.up.railway.app` | ✅ probes: `/login` 200 · `/` → 307 · `/register` 200 · API 401 | me |
+| 2026-10-19 | Phase R0: project + first deploy + domain | ✅ domain generated; volume/serverless confirmation pending | you |
+| | Phase R3 (admin claim + approval-flow test) | ⏳ next | you + me |
