@@ -1,6 +1,6 @@
 # Deployment Plan — Savings Tracker (Free Hosting)
 
-> **Status:** 🚀 EXECUTING — Railway Free is the chosen path (2026-10-19).
+> **Status:** ✅ **DEPLOYED** (2026-10-19) — Railway Free · `https://savings-tracker-production-e934.up.railway.app` · admin `zanesonsona` · verified backups in `~/savings-backups/`.
 > **v3 changelog:** collapsed to a **single path: Railway Free** (your call to keep things simple). Oracle/GCP/PC alternatives are kept below as fallbacks only. The exec bit + quoting quirks on Windows-vs-WSL are cosmetic, noted in §8.
 > **Who:** *You* = browser steps only (marked **you**, ~6 minutes total); *Infra agent* = everything else (marked **me**).
 > **Companion:** `Project_state.md` = single source of truth for app scope/status; this file = deployment runbook.
@@ -11,7 +11,7 @@
 2. **Railway Free** fits: persistent 0.5 GB volume, HTTPS on `*.up.railway.app`, no card needed, $0/month for our usage (capped by a $1/month credit). Deploy auto-builds our Dockerfile from GitHub.
 3. **The trade-off you accepted:** the service **sleeps when idle** (~5–10 min) → first visit takes 5–30 s to wake, rarely a 502 (retry once). Our image disables Next.js telemetry, which is a known sleep-blocker.
 4. **What only you can do** (blocking, non-delegable): sign in / authorize GitHub (≈2 min), paste 2 variables + click deploy (≈2 min), register the admin account the moment I say it's live (≈2 min, security-critical §7).
-5. **What I do:** repo hygiene + commit/push, exact values for the variables (I generated the secret), verify the live app (probes, logs, empty DB), back off if anything misbehaves.
+5. **What I did:** repo hygiene + commit/push, generated the secret, verified the live app (probes, admin claim, approval flow, restart persistence), and left a tested one-command backup script (`~/savings-backups/backup.sh`).
 
 > Production starts **empty** (the dev seed refuses to run in production). Your local dev DB is untouched and is **not** deployed.
 
@@ -87,11 +87,14 @@
 | `SESSION_SECRET` | *shown by me at U2 time* — generated with `openssl rand -base64 32`, stored at `~/.savings-session-secret.txt` on your machine (chmod 600) | Never commit; changing it signs everyone out. |
 | `RAILWAY_RUN_UID=0` | `0` | Railway's documented fix for volumes + non-root images (our container runs as `node` uid 1000). |
 
-Everything else is baked into the image. No Dockerfile changes, no compose file, no CLI required.
+Everything else is baked into the image. **One Dockerfile exception (2026-10-19):** the `VOLUME` instruction was removed — Railway bans that keyword during build validation; storage is attached at runtime instead. The Railway CLI is used only for backups/logs, not for deploying.
 
 ## 5. Backups, updates, failure modes
 
-- **Backups (primary):** Railway volume snapshots — Traffic/Volume → **Backups** → manual + scheduled where available on Free; volume data is included in Railway's platform durability. **Secondary:** `railway volume browse` / `railway ssh` to copy `dev.db` out to your PC (I'll do this once after go-live; with the Railway CLI, `railway login` is one browser click by you).
+- **Backups (tested 2026-10-19):** `~/savings-backups/backup.sh` pulls `/dev.db` from the Railway volume (`railway volume files download`), verifies it with `check.cjs` (`PRAGMA integrity_check` + tables/users dump), and keeps the 14 newest copies in `~/savings-backups/`. Run it monthly and before any risky change. First copies: `dev-2026-10-19.db` (pre-restart) and `dev-2026-10-19_1404.db` (post-restart) — both `integrity_check=ok`.
+- **CLI setup (done):** `~/.railway/bin/railway` v5.70.0 (official installer), signed in as the workspace owner, linked to project `precious-hope` → service `savings-tracker` (the link is keyed to the repo directory). SSH key `savings-cli` registered — volume file access requires it.
+- **Logs/ops:** `railway logs -d --lines 100` (deploy logs) · `railway service restart -y` — note this CLI build can exit with a timeout *after* performing the restart; confirm by a fresh `Mounting volume` / `Starting Savings Tracker on port 8080…` boot in the logs, not by the exit code.
+- **Custom domain (optional):** adding a domain you already own is **free** on Railway (automatic TLS; CNAME + TXT records). Buying the domain itself costs ~$10–15/yr — the free `*.up.railway.app` URL works identically (HTTPS + secure cookies).
 - **Updates:** push to `main` → Railway auto-redeploys (rebuild from Dockerfile; migrations run at boot). Rollback = redeploy a previous build from the Deployments menu (Free keeps 24 h of images).
 - **Cold boots:** first visit after ≥5–10 min idle takes 5–30 s; a rare 502 on the very first hit — retry once. This is the accepted cost of $0 + no card.
 - **Usage ceiling:** Free = $1/month credit (no rollover); if exceeded, workloads pause until the cycle resets — **volume data survives**. Light personal use projects ≈ $0.15–0.40/month of usage. Optional: email alert at the workspace Usage page.
@@ -129,5 +132,8 @@ Everything else is baked into the image. No Dockerfile changes, no compose file,
 | 2026-10-19 | Plan v3 (Railway-only) written + committed | ✅ commit `60ab2e5` | me |
 | 2026-10-19 | First Railway build rejected — `VOLUME` keyword banned in Dockerfiles | ✅ removed from Dockerfile, pushed for rebuild | me |
 | 2026-10-19 | App live at `savings-tracker-production-e934.up.railway.app` | ✅ probes: `/login` 200 · `/` → 307 · `/register` 200 · API 401 | me |
-| 2026-10-19 | Phase R0: project + first deploy + domain | ✅ domain generated; volume/serverless confirmation pending | you |
-| | Phase R3 (admin claim + approval-flow test) | ⏳ next | you + me |
+| 2026-10-19 | Phase R0: project + deploy + domain + volume + serverless | ✅ volume `savings-tracker-volume` @ `/app/data` (500 MB) · serverless on · region iad | you |
+| 2026-10-19 | Phase R3: admin claim | ✅ first account `zanesonsona` = ADMIN/APPROVED | you |
+| 2026-10-19 | Phase R3: approval flow e2e | ✅ throwaway `deploy-check-e934` → PENDING → rejected by admin → login 403 "declined" | me |
+| 2026-10-19 | Restart/persistence test | ✅ boot 2→3 with volume mounted; "No pending migrations to apply"; probes + declined state intact | me |
+| 2026-10-19 | First backups + script | ✅ `dev-2026-10-19.db`, `dev-2026-10-19_1404.db` · `integrity_check=ok` · `~/savings-backups/backup.sh` tested | me |
