@@ -1,7 +1,8 @@
 # Deployment Plan — Savings Tracker (Free Hosting)
 
-> **Status:** ✅ **DEPLOYED** (2026-10-19; **Phase 3 redeploy 2026-10-21**) — Railway Free · `https://savings-tracker-production-e934.up.railway.app` · admin `zanesonsona` · verified backups in `~/savings-backups/`.
-> **v4 changelog (Phase 3):** same Railway path; the deploy now also ships the installable PWA and offline fallback. No new variables, services or volume changes. After a push, the new service worker activates through the in-app **Update available — Refresh** toast. See §5 and the 2026-10-21 rows in §9.
+> **Status:** ✅ **Phase 2 DEPLOYED** (2026-10-19) — Railway Free · `https://savings-tracker-production-e934.up.railway.app` · admin `zanesonsona` · verified backups in `~/savings-backups/`.
+> **⏳ Phase 3 deploy pending (2026-10-21):** revision `fe54962` is pushed and all local gates/QA/Docker checks are green, but Railway's build service is in a **major outage** (“builds paused in all regions”, status.railway.com incident `QH8L8B3E`). `railway up` returns “Deploys have been paused temporarily”; retries are queued. The live site still serves Phase 2 until the build resumes.
+> **v4 changelog (Phase 3):** the deploy adds the installable PWA and offline fallback. No new variables, services or volume changes. After a successful build, the new service worker activates through the in-app **Update available — Refresh** toast. See §5 and the 2026-10-21 rows in §9.
 > **v3 changelog:** collapsed to a **single path: Railway Free** (your call to keep things simple). Oracle/GCP/PC alternatives are kept below as fallbacks only. The exec bit + quoting quirks on Windows-vs-WSL are cosmetic, noted in §8.
 > **Who:** *You* = browser steps only (marked **you**, ~6 minutes total); *Infra agent* = everything else (marked **me**).
 > **Companion:** `Project_state.md` = single source of truth for app scope/status; this file = deployment runbook.
@@ -140,3 +141,7 @@ Everything else is baked into the image. **One Dockerfile exception (2026-10-19)
 | 2026-10-19 | Phase R3: approval flow e2e | ✅ throwaway `deploy-check-e934` → PENDING → rejected by admin → login 403 "declined" | me |
 | 2026-10-19 | Restart/persistence test | ✅ boot 2→3 with volume mounted; "No pending migrations to apply"; probes + declined state intact | me |
 | 2026-10-19 | First backups + script | ✅ `dev-2026-10-19.db`, `dev-2026-10-19_1404.db` · `integrity_check=ok` · `~/savings-backups/backup.sh` tested | me |
+| 2026-10-21 | Phase 3 gates + local QA | ✅ 93/93 tests · lint/tsc/build green · production-browser 97/97 · API 192 PASS + 7 documented · Lighthouse 99/96 perf, 100 a11y/BP/SEO | me |
+| 2026-10-21 | Phase 3 Docker smoke | ✅ fresh-volume boot/migrations · probes 200/307/401 · first admin + category create · restart persistence | me |
+| 2026-10-21 | Phase 3 revision pushed | ✅ `fe54962` on `main` (GitHub) | me |
+| 2026-10-21 | Railway redeploy attempt | ⏳ **blocked by Railway outage** — “builds paused in all regions” (`QH8L8B3E`); `railway up` → “Deploys have been paused temporarily”; retry loop running | me |
