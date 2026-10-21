@@ -6,11 +6,11 @@
 
 ## Project Manager
 
-**Last updated:** 2026-10-19 · **Plan version:** PM v2 (Phase 2 added; T32 QA defects fixed in T33 and re-verified by QA round 4) · **Next up:** — (no open tasks; T33 closed by the QA re-verification 2026-10-17 — see §Senior QA) · **Deployed:** ✅ Railway Free (2026-10-19) → `deployment_plan.md` · **Progress:** Phase 1: 20/20 ✅ (T01–T20) · Phase 2: 13/13 ✅ (T21–T33)
+**Last updated:** 2026-10-21 · **Plan version:** PM v3 (Phase 3 added — UI refresh + PWA; Phase 2 complete and deployed) · **Next up:** T34 — Design system v2 + shared primitives · **Deployed:** ✅ Railway Free (2026-10-19) → `deployment_plan.md` · **Progress:** Phase 1: 20/20 ✅ (T01–T20) · Phase 2: 13/13 ✅ (T21–T33) · Phase 3: 0/7 ⬜ (T34–T40)
 
 ### 1. Vision
 
-A local, single-user web app to track income, expenses, and savings. The user enters their income/salary; the app automatically splits each income across the user's **own custom categories** (e.g., Bills, Needs, Debts, Savings) based on percentages the user defines. The user then logs real expenses and savings deposits/withdrawals, and sees plan-vs-actual per category plus a running savings balance — all in one clean dashboard. **Phase 2 (added 2026-10-17):** the app becomes multi-account — anyone can register, but signing in requires **Admin approval**, and every account keeps its **own clean record** (categories, income, expenses, savings). Phase 2 also adds an all-time **Wallet balance** (cash not spent or saved), **multi-select category filters** on each tab, a UI polish pass and a **Night mode**.
+A local web app to track income, expenses, and savings. The user enters their income/salary; the app automatically splits each income across the user's **own custom categories** (e.g., Bills, Needs, Debts, Savings) based on percentages the user defines. The user then logs real expenses and savings deposits/withdrawals, and sees plan-vs-actual per category plus a running savings balance — all in one clean dashboard. **Phase 2 (added 2026-10-17):** the app becomes multi-account — anyone can register, but signing in requires **Admin approval**, and every account keeps its **own clean record** (categories, income, expenses, savings). Phase 2 also adds an all-time **Wallet balance** (cash not spent or saved), **multi-select category filters** on each tab, a UI polish pass and a **Night mode**. **Phase 3 (added 2026-10-21):** a **refined-fintech UI refresh** — desktop sidebar + mobile bottom tabs, a richer dashboard (hero balance, stat cards, allocation donut, 6-month trend), modern dialogs/toasts/skeletons — and an **installable PWA** with a safe offline fallback that never caches financial data.
 
 ### 2. MVP scope
 
@@ -23,10 +23,10 @@ A local, single-user web app to track income, expenses, and savings. The user en
 - Clean empty states that guide first-time setup.
 
 **Out of scope (Later backlog — do NOT build now)**
-Bank sync · recurring salary auto-entry · editing past entries (create + delete only) · allocation versioning per income · charts/trends beyond the month view · CSV export · settings page · mobile app/PWA.
-*(PM v1 listed auth/multi-user and dark mode here too — both moved into Phase 2, see §8 T21–T31.)*
+Bank sync · recurring salary auto-entry · editing past entries (create + delete only) · allocation versioning per income · charts/analytics beyond the Phase 3 dashboard donut + 6-month trend · CSV export · settings page · native app store packaging · offline editing/sync · push notifications.
+*(PM v1 listed auth/multi-user and dark mode here too — both moved into Phase 2. Phase 3 moved the old “charts/trends beyond the month view” and “mobile app/PWA” items into scope, see below.)*
 
-**Phase 2 scope (approved 2026-10-17 — backlog in §8, tasks T21–T32)**
+**Phase 2 scope (approved 2026-10-17 — backlog in §8, tasks T21–T33)**
 
 *In scope*
 - Local accounts + **login page**: username + password; registration requires **Admin approval** before first sign-in (D14); the **first-ever sign-up becomes the Admin** (D15).
@@ -36,7 +36,19 @@ Bank sync · recurring salary auto-entry · editing past entries (create + delet
 - **UI polish pass** + **Night mode** with a persisted toggle (D20).
 
 *Out of scope (Phase 2)*
-- Email verification/notifications, OAuth/social login, password reset/change, account deletion/deactivation, admin-set passwords, shared/household data, multi-device sync, charts, CSV export, PWA.
+- Email verification/notifications, OAuth/social login, password reset/change, account deletion/deactivation, admin-set passwords, shared/household data, multi-device sync, charts beyond the Phase 3 dashboard, CSV export.
+
+**Phase 3 scope (approved 2026-10-21 — backlog in §8, tasks T34–T40)**
+
+*In scope*
+- **Refined-fintech UI refresh** (D22): emerald brand accent on the existing token layer, desktop sidebar + mobile bottom tab bar, shared page/card/skeleton/toast/dialog primitives, icon set.
+- **Dashboard 2.0** (D25): wallet hero, stat cards with month-over-month deltas, allocation donut, 6-month income-vs-spent trend, category status cards.
+- **Page refresh + modern interactions** (D26): Income/Expenses/Savings/Categories/auth screens, add-forms in modal/sheet, styled confirms, toasts, skeletons, reduced-motion-safe transitions.
+- **Installable PWA** (D23): manifest, 192/512/maskable/Apple icons, standalone display, shortcuts, install prompt + iOS instructions, theme/viewport metadata.
+- **Offline fallback** (D24): hand-written service worker, `/offline` page, offline banner, update toast; no account data, HTML/RSC or API responses cached.
+
+*Out of scope (Phase 3)*
+- Cached financial data / offline viewing, offline editing or background sync, push notifications, web-push/VAPID, native app store packaging, custom domains, charts beyond the dashboard donut + 6-month trend, redesign of the API/auth model.
 
 ### 3. Locked decisions
 
@@ -63,6 +75,11 @@ Bank sync · recurring salary auto-entry · editing past entries (create + delet
 | D19 | **Category filters:** **multi-select, flat** categories (tick several at once, OR-combined; e.g. Needs + Wants together) on Expenses, Savings and Dashboard. No category-group model. Filters affect the visible list + list totals; all-time balances (savings) stay account-wide. | user-confirmed 2026-10-17 |
 | D20 | **UI refresh + Night mode:** light / dark / **system** theme, toggle persisted (`localStorage`), no flash-of-wrong-theme; a token layer (CSS variables) added in T30 so T31 flips one palette. Supersedes the T06 “light theme only” note. | user-confirmed (Phase 2 request) |
 | D21 | **Legacy single-user dev data:** rows that predate accounts (dev DBs only — the current DB is empty) are claimed by the **first Admin** created after the upgrade; if implementation makes that unsafe, reset + document the reset instead. | PM |
+| D22 | **UI direction (Phase 3):** refined fintech — keep the T30/T31 token layer, add an **emerald brand accent**, soft elevation, chart tokens and larger type; **desktop sidebar + mobile bottom tab bar**; `lucide-react` icons (already allowed by D11); hand-rolled accessible SVG charts; CSS/ViewTransition motion that respects `prefers-reduced-motion`. **No UI/component/chart library.** | user-confirmed 2026-10-21 |
+| D23 | **PWA installability:** `app/manifest.ts` with 192/512/maskable/Apple icons, `display: "standalone"`, `start_url`/`scope` `/`, shortcuts to Income/Expenses/Savings, iOS `appleWebApp` metadata and `themeColor`/`viewportFit: cover`; install affordance via `beforeinstallprompt` + iOS “Add to Home Screen” instructions; production-only service-worker registration; HTTPS required (already provided by Railway). | user-confirmed 2026-10-21 |
+| D24 | **Offline scope = installable + offline fallback only.** The service worker precaches `/offline`, PWA icons and the manifest; navigations are network-first with `/offline` as fallback; `/_next/static/**` is cache-first; **never** caches `/api/**`, HTML/RSC or account data. No offline viewing/editing, background sync or push notifications. | user-confirmed 2026-10-21 |
+| D25 | **Dashboard visualization:** allocation donut from the existing `categories` payload; 6-month income-vs-spent trend via additive `GET /api/overview?trend=6` (UTC months, per account, one query per data table). Charts stay hand-rolled SVG with an accessible text/table fallback — no chart dependency. Supersedes the old “charts/trends beyond the month view” exclusion for this dashboard scope. | user-confirmed 2026-10-21 |
+| D26 | **Modern interactions:** add-income/expense/savings forms open in a centered modal on desktop and a bottom sheet on mobile; styled confirm dialogs replace `window.confirm`; toasts report action results; skeleton loaders replace text loading states; subtle motion (CSS + React 19.3 `ViewTransition`) with reduced-motion support. Data/API behavior is unchanged. | user-confirmed 2026-10-21 |
 
 ### 4. Stack & conventions
 
@@ -71,16 +88,25 @@ Bank sync · recurring salary auto-entry · editing past entries (create + delet
 - **Validation:** `zod` in every API route before touching the DB.
 - **API style:** Route handlers under `app/api/**` (JSON). Server components by default; `"use client"` only for interactive parts. No global state library — plain React state + `fetch`; after mutations, refetch or `router.refresh()`.
 - **Auth (Phase 2):** local accounts only; no auth packages (D11 stays) — `node:crypto` scrypt password hashes + HMAC-signed httpOnly session cookie (D17). Every data endpoint reads the session and scopes its queries to that account; admin endpoints check `role === "ADMIN"`. UI routes redirect to `/login` when signed out (the exact guard mechanism — middleware vs per-layout — must follow the bundled Next docs; see T25/AGENTS.md).
+- **UI (Phase 3):** all colors/radii/shadows come from the token layer; money renders through `formatCents` with tabular numerals. Reusable primitives live in `components/` (`AppShell`, `PageHeader`, `StatCard`, `Skeleton`, `Toaster`, `ConfirmDialog`, `MonthPicker`, `AllocationDonut`, `TrendChart`). Add-form dialogs reuse the existing page handlers; no new state library (D22/D26).
+- **PWA (Phase 3):** `app/manifest.ts` for install metadata; a hand-written `public/sw.js` (no service-worker library) registered only in production; cache policy per **D24** (never cache API/HTML/account data); `/offline` is public and outside the `proxy.ts` guard; PWA behavior is verified against `next build && next start`, not `next dev`.
 - **Note:** Prisma + SQLite does **not support enums** — `kind`/`direction` are `String` columns validated by zod (`"EXPENSE" | "SAVINGS"`, `"DEPOSIT" | "WITHDRAWAL"`).
 - **Planned layout:**
   ```
-  app/page.tsx                 (Dashboard)
-  app/income/page.tsx  app/expenses/page.tsx  app/savings/page.tsx  app/categories/page.tsx
-  app/login/page.tsx  app/register/page.tsx  app/admin/users/page.tsx      ← Phase 2 (T24/T27)
-  app/api/{categories,incomes,expenses,savings,overview}/route.ts (+ [id]/route.ts)
-  app/api/auth/{register,login,logout,me}/route.ts  app/api/admin/users/…  ← Phase 2 (T23/T27)
-  components/   (Nav, forms, lists, MonthPicker, CategoryCard, ProgressBar…, ThemeToggle ← Phase 2)
-  lib/          (prisma.ts, money.ts, allocation.ts, dates.ts, validation.ts, constants.ts, types.ts, auth.ts ← Phase 2)
+  app/(app)/page.tsx            (Dashboard)
+  app/(app)/{income,expenses,savings,categories}/page.tsx
+  app/(app)/admin/users/page.tsx
+  app/(auth)/{login,register}/page.tsx
+  app/offline/page.tsx          ← Phase 3 (PWA offline fallback)
+  app/manifest.ts               ← Phase 3 (PWA manifest)
+  app/api/{categories,incomes,expenses,savings}/route.ts (+ [id]/route.ts)
+  app/api/auth/{register,login,logout,me}/route.ts  app/api/admin/users/…
+  app/api/overview/route.ts     (Phase 3 adds ?trend=N — T36)
+  components/   (AppShell, Nav, PageHeader, StatCard, forms, lists, MonthPicker…, ThemeToggle,
+                 AllocationDonut, TrendChart, InstallPrompt, OfflineBanner, PwaRegister ← Phase 3)
+  lib/          (prisma.ts, money.ts, allocation.ts, dates.ts, validation.ts, constants.ts,
+                 types.ts, auth.ts, use-online.ts ← Phase 3)
+  public/       (sw.js, icons/* ← Phase 3)
   prisma/       (schema.prisma, seed.ts, dev.db)
   ```
 - **Commands (exist after T02):** `npm run dev` · `npm run build` · `npm run lint` · `npm test` · `npm run db:migrate` · `npm run db:studio` · `npm run db:seed` (after T15) · Docker (after T20): `docker build -t savings-tracker .` then `docker run --rm -p 3000:3000 -v savings-data:/app/data savings-tracker`.
@@ -167,11 +193,11 @@ Error shape everywhere: `{ "error": "<human-readable message>" }` with 400 (vali
 | `/api/categories/[id]` | PATCH, DELETE | PATCH re-validates Σ%; DELETE blocked if entries exist (D9) |
 | `/api/incomes` | GET, POST | GET `?month=YYYY-MM` optional filter |
 | `/api/incomes/[id]` | DELETE | |
-| `/api/expenses` | GET, POST | GET `?month=` & `?categoryId=`; POST rejects non-EXPENSE categories |
+| `/api/expenses` | GET, POST | GET `?month=` & `?categoryIds=1,2,3` (OR, empty = all); POST rejects non-EXPENSE categories |
 | `/api/expenses/[id]` | DELETE | |
-| `/api/savings` | GET, POST | GET `?month=` returns `{ entries, balanceCents, monthNetCents }`; POST rejects non-SAVINGS categories |
+| `/api/savings` | GET, POST | GET `?month=` & `?categoryIds=` returns `{ entries, balanceCents, monthNetCents }`; POST rejects non-SAVINGS categories |
 | `/api/savings/[id]` | DELETE | |
-| `/api/overview` | GET | `?month=YYYY-MM` → full dashboard payload (shape fixed in T13; Phase 2 adds `walletBalanceCents` — T28) |
+| `/api/overview` | GET | `?month=YYYY-MM` → full dashboard payload (shape fixed in T13; Phase 2 adds `walletBalanceCents` — T28; Phase 3 adds optional `?trend=1–12` → `trend[]` — T36) |
 
 **Auth & admin endpoints (Phase 2 — added by T23/T27):**
 
@@ -185,6 +211,8 @@ Error shape everywhere: `{ "error": "<human-readable message>" }` with 400 (vali
 | `/api/admin/users/[id]/approve` · `/reject` | POST | **ADMIN only**; `PENDING` → `APPROVED`/`REJECTED` (409 if already decided); an admin cannot decide their own account |
 
 **Phase 2 change for every data endpoint above:** a session is required (**401** `Authentication required` when signed out) and all reads/writes are scoped to the session account (D16) — another account's ids return **404**, and category names are unique per account.
+
+**Phase 3 change (T36):** `GET /api/overview` accepts an optional `?trend=N` (integer 1–12; malformed/out-of-range → 400). When present, the response adds `trend: [{ month, incomeTotalCents, spentCents, netSavedCents }]` — N entries ending at the selected month. When absent, the payload is unchanged. No other endpoint changes in Phase 3.
 
 ### 7. Business rules (math)
 
@@ -213,13 +241,20 @@ Invariant: `Σ allocations + unallocatedCents == amountCents`, always.
 - **Sessions (T22):** signed cookie `st_session` (HMAC-SHA256 over `{ uid, exp }`, secret `SESSION_SECRET`, 30-day expiry, httpOnly, `SameSite=Lax`, `Secure` in production). Expired / tampered / unknown-user sessions are treated as signed out: 401 on APIs, redirect to `/login` on pages.
 - **Category filters (T29, D19):** multi-select, OR-combined — `?categoryIds=1,2,3`. Expenses: list + live total follow the selection. Savings: list follows it and `monthNetCents` is computed over the selected categories; all-time `balanceCents` stays account-wide. Dashboard: rows filter client-side; summary cards stay account-wide.
 
+**Phase 3 rules**
+
+- **Trend (T36, D25):** `?trend=N` (integer 1–12) returns N monthly buckets ending at the selected `month` (oldest first). Each bucket: `incomeTotalCents` = Σ incomes, `spentCents` = Σ expenses (EXPENSE-kind actuals), `netSavedCents` = Σ deposits − Σ withdrawals; ranges follow the UTC month rule above and are scoped to the session account. Absent param → no `trend` field.
+- **PWA/offline (T38/T39, D23/D24):** the app is installable over HTTPS; the service worker **never** caches `/api/**`, HTML/RSC or account data. Offline navigations fall back to `/offline`; only `/offline`, PWA icons, the manifest and hashed static assets are cached. Installed/standalone mode uses the same auth and session rules.
+- **UI behavior (T34–T37, D22/D26):** visual changes must not alter API semantics or money math; delete confirmations remain required; both themes and 390px mobile are part of every UI task's acceptance.
+
 ### 8. Backlog
 
 Status legend: ⬜ TODO · 🔄 IN PROGRESS · ✅ DONE · ⛔ BLOCKED
 Rule: never start a task whose dependencies are not ✅. If a task turns out bigger than expected, split it into `Txx-a` / `Txx-b` blocks here instead of doing everything at once.
 
 **Phases:** *Phase 1 (MVP — ✅ T01–T20):* P0 Setup (T01–T03) · P1 Utilities (T04) · P2 Categories (T05–T06) · P3 Income (T07–T08) · P4 Expenses (T09–T10) · P5 Savings (T11–T12) · P6 Dashboard (T13–T14) · P7 Hardening (T15–T16 + defect fixes T17–T18 · PHP T19 · Docker T20)
-**Phases — Phase 2 (⬜ T21–T32):** P8 Accounts & auth (T21–T27) · P9 Wallet balance (T28) · P10 Category filters (T29) · P11 UI polish & Night mode (T30–T31) · P12 Phase 2 QA (T32)
+**Phases — Phase 2 (✅ T21–T33):** P8 Accounts & auth (T21–T27) · P9 Wallet balance (T28) · P10 Category filters (T29) · P11 UI polish & Night mode (T30–T31) · P12 Phase 2 QA (T32–T33)
+**Phases — Phase 3 (⬜ T34–T40):** P13 Design system & shell (T34–T35) · P14 Dashboard & interactions (T36–T37) · P15 PWA & offline (T38–T39) · P16 Phase 3 QA & deploy (T40)
 
 ---
 
@@ -387,9 +422,9 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 
 ---
 
-### Phase 2 backlog — Accounts, Wallet, Filters & UX (T21–T32)
+### Phase 2 backlog — Accounts, Wallet, Filters & UX (T21–T33)
 
-> **Planned:** 2026-10-17 (PM v2; decisions D14–D21 confirmed with the user the same day). **Phase 1 is complete (T01–T20 ✅); Phase 2 is underway — T21–T22 ✅, next is T23.** Same rule as above: never start a task whose dependencies are not ✅.
+> **Planned:** 2026-10-17 (PM v2; decisions D14–D21 confirmed with the user the same day). **Phase 2 is complete (T21–T33 ✅) and deployed.** Same rule as above: never start a task whose dependencies are not ✅.
 
 #### T21 — Auth data model + migration (User + per-account ownership)
 **Status:** ✅ DONE · **Depends on:** T20 ✅ · **Files:** `prisma/schema.prisma`, `prisma/migrations/*`
@@ -510,11 +545,76 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 
 ---
 
+### Phase 3 backlog — UI refresh & PWA (T34–T40)
+
+> **Planned:** 2026-10-21 (PM v3; decisions D22–D26 confirmed with the user the same day). **Phase 1 + Phase 2 are complete and deployed; Phase 3 starts at T34.** Execution order: **T34 → T35 → T36 → T37 → T38 → T39 → T40**. T38 depends only on T34 but follows the sequential protocol. Same rule as above: never start a task whose dependencies are not ✅.
+
+#### T34 — Design system v2 + shared primitives
+**Status:** ⬜ TODO · **Depends on:** T33 ✅ · **Files:** `package.json`, `app/globals.css`, `app/layout.tsx`, `components/{PageHeader,Skeleton,Toaster,ConfirmDialog,MonthPicker}.tsx`
+- Extend the T30/T31 token layer (D22): emerald `--brand*` pair (light/dark), `--surface-raised`, `--overlay`, elevation tokens, 6-color chart palette, larger radii; keep the existing semantic names working. Retune `.btn-primary`/active nav to the brand accent; add `.money` (`font-variant-numeric: tabular-nums`) and a shared `.card`/panel treatment. Audit contrast in both themes.
+- Add **`lucide-react`** (allowed by D11) with a small icon vocabulary for nav, stat cards, actions, empty states and the install/offline UI.
+- Build shared primitives: `PageHeader` (title/description/actions), `Skeleton`, `ToastProvider` + `useToast` (portal, `role=status|alert`, auto-dismiss), `ConfirmDialog` + `useConfirm` (native `<dialog>`, focus return, Escape/backdrop), `MonthPicker` (prev/next/today, `aria-live` label). Mount `ToastProvider` in the root layout.
+- No API or data changes. Do not migrate page layouts yet beyond what the primitives require.
+- **Acceptance criteria:** `npm test` / lint / build green; tokens + primitives compile and render in light/dark; focus-visible and reduced-motion respected; no raw palette utilities added outside the token layer; `lucide-react` is the only new runtime dependency.
+
+#### T35 — App shell + responsive navigation
+**Status:** ⬜ TODO · **Depends on:** T34 ✅ · **Files:** `components/AppShell.tsx` (new), `components/Nav.tsx` (replaced), `app/(app)/layout.tsx`, `components/ThemeToggle.tsx`
+- Desktop (`lg+`): fixed left sidebar with brand mark, icon+label nav, active pill, **Admin** link only for admins, an install slot (wired in T38), theme control, and username/logout at the bottom.
+- Mobile: compact top bar (brand + overflow menu for theme/install/admin/logout) and a **fixed bottom tab bar** with five destinations — Dashboard, Income, Expenses, Savings, Categories — using `env(safe-area-inset-bottom)` and 44px touch targets. Content gets matching bottom padding.
+- Keep the `(app)` session guard, `proxy.ts` matcher and all URLs unchanged. Content container becomes `max-w-6xl`; no horizontal scroll at 320px.
+- **Acceptance criteria:** 320/390/768/1024/1440 layouts have no wrapping/overflow; active state matches every route; admin link hidden for USER; logout works; keyboard focus reaches every nav item; both themes; gates green.
+
+#### T36 — Dashboard 2.0 + trend API
+**Status:** ⬜ TODO · **Depends on:** T34 ✅, T35 ✅ · **Files:** `app/api/overview/route.ts`, `lib/types.ts`, `lib/dates.ts` (reuse), `app/api/tenancy.test.ts` + route tests, `app/(app)/page.tsx`, `components/{AllocationDonut,TrendChart,StatCard}.tsx`
+- Extend `GET /api/overview` with optional **`?trend=N`** (D25): integer 1–12 (malformed/out-of-range → 400); build N UTC month buckets ending at the selected month (oldest first); one scoped query per data table; add `trend: [{ month, incomeTotalCents, spentCents, netSavedCents }]`; **absent param → payload unchanged**. `spentCents` = expenses only; `netSavedCents` = deposits − withdrawals.
+- Tests: N-month sequence + year boundary, zero-data months, malformed/0/13 → 400, cross-account isolation, existing overview assertions unchanged.
+- Dashboard: wallet balance **hero** (gradient/dark surface, red when negative), stat cards with icons and month-over-month deltas (from `trend`), **allocation donut** from `categories.allocatedCents` (+ neutral unallocated slice) with legend, **6-month grouped income-vs-spent bars** with an accessible table/summary, and category status cards (progress, plan %, remaining/over, On track / Near limit / Over badge).
+- Keep T29 filter semantics: chips filter category rows only; cards/donut/trend stay account-wide. Loading skeletons replace text; empty states for no categories/income.
+- **Acceptance criteria:** all figures reconcile with the Income/Expenses/Savings tabs; trend hand-checked for 6 months incl. a year boundary; without `?trend` the payload is byte-for-byte compatible with the old shape; both themes + 390px; gates green.
+
+#### T37 — Page refresh + modern interactions
+**Status:** ⬜ TODO · **Depends on:** T34 ✅, T35 ✅, T36 ✅ · **Files:** `app/(app)/{income,expenses,savings,categories}/page.tsx`, `app/(app)/admin/users/page.tsx`, `app/(auth)/{login,register}/page.tsx`, `components/{IncomeForm,ExpenseForm,SavingsForm,CategoryEditor,AdminUsers,AuthCard,EmptyState,CategoryMultiSelect,ProgressBar}.tsx`
+- Apply the new visual language to every remaining screen: `PageHeader`, cards, responsive list rows, tabular amounts, status badges, consistent empty states with icons.
+- Move add-income/expense/savings forms into a **centered modal on desktop / bottom sheet on mobile** opened from the page-header CTA (D26). Reuse the existing submit handlers, validation and error copy; close on success and show a toast. Categories keep inline create/edit (styled).
+- Replace every `window.confirm` with `useConfirm`; add success/error toasts; replace remaining `Loading…` with skeletons. Keep delete blocking/error behavior identical.
+- Auth pages: split-screen brand panel on desktop, centered card on mobile; keep `method="post"`, hydration-disable and `window.location.replace("/")` from T33. Admin approvals get the same dialogs/toasts.
+- Subtle page/list motion (CSS + React 19.3 `ViewTransition` where supported), all disabled under `prefers-reduced-motion`.
+- **Acceptance criteria:** every existing flow still works end-to-end (create/list/delete, filters, categories CRUD, admin approve/reject, login/register/logout); no `window.confirm` or text-only "Loading…" left; dialogs are keyboard/Escape/focus-return accessible; toasts announced; both themes + 390px; no console errors; gates green.
+
+#### T38 — PWA installability (manifest, icons, install UX)
+**Status:** ⬜ TODO · **Depends on:** T34 ✅ · **Files:** `app/manifest.ts`, `app/layout.tsx` (metadata/viewport), `public/icons/*`, `components/InstallPrompt.tsx`, `next.config.ts`, `README.md`
+- Add `app/manifest.ts` (D23): name/short name/description, `id`/`start_url`/`scope` `/`, `display: "standalone"`, `orientation: "any"`, `background_color`/`theme_color`, `categories: ["finance","productivity"]`, shortcuts to `/income`, `/expenses`, `/savings`, and icons 192/512 + maskable 512 + Apple 180. Generate the PNGs once from the SVG mark (one-off tooling; **no `sharp` dependency in `package.json`**) and commit them under `public/icons/`.
+- Root layout: `appleWebApp` metadata (`capable`, title, status bar) and `viewport` with light/dark `themeColor`, `viewportFit: "cover"`, `width=device-width`. Keep zoom enabled.
+- `InstallPrompt`: capture `beforeinstallprompt`, shared store so the sidebar and mobile menu can both trigger it; iOS Safari gets the “Share → Add to Home Screen” dialog; hide when standalone/installed; `appinstalled` toast. Register nothing yet (SW lands in T39).
+- `next.config.ts`: correct `Content-Type` + `Cache-Control: no-cache` for the manifest; add the `/sw.js` header block in T39.
+- **Acceptance criteria:** manifest fetches 200 with valid JSON and every icon 200 at the declared size; SSR head carries the manifest link + Apple/theme metadata; install UI appears only when installable (or iOS) and hides when standalone; gates green.
+
+#### T39 — Offline fallback + service worker
+**Status:** ⬜ TODO · **Depends on:** T38 ✅ · **Files:** `public/sw.js`, `app/offline/page.tsx`, `components/{PwaRegister,OfflineBanner}.tsx`, `lib/use-online.ts`, `next.config.ts`, `app/layout.tsx` / `app/(app)/layout.tsx`
+- **`public/sw.js` (hand-written, D24):** versioned cache; precache `/offline`, PWA icons and the manifest; install → activate cleanly; fetch handler — navigations network-first → cached `/offline`, `/_next/static/**` + icons cache-first, **all `/api/**`, HTML/RSC and cross-origin requests pass through** (never cached); delete old caches; `SKIP_WAITING` message support.
+- **`app/offline/page.tsx`:** public, themed, nav-free offline page with a Retry button and the app brand; no auth calls/data.
+- **`PwaRegister`:** register `/sw.js` **only in production** (`NODE_ENV === "production"`), `updateViaCache: "none"`, detect a waiting worker and show an “Update available — Refresh” toast that activates it and reloads once.
+- **`OfflineBanner`:** `useSyncExternalStore` over `online`/`offline` events (server snapshot online); banner under the shell; no caching of account data.
+- `next.config.ts`: `/sw.js` served with `Content-Type: application/javascript; charset=utf-8`, `Cache-Control: no-cache, no-store, must-revalidate`, `Service-Worker-Allowed: /` (and the PWA CSP note if headers are added).
+- **Acceptance criteria:** on a **production build**, the SW is active; a signed-in offline reload lands on `/offline`; Cache Storage contains **no `/api/**`, HTML or RSC** entries; reconnecting resumes normal data loads; an update deploys and the toast/reload path works; dev (`next dev`) behaves unchanged; Docker image still boots; gates green.
+
+#### T40 — Phase 3 QA, docs, and deployment
+**Status:** ⬜ TODO · **Depends on:** T34–T39 ✅ · **Files:** `Project_state.md`, `README.md`, `deployment_plan.md`; small fixes only (non-trivial defects → queue T41+)
+- Gates: full `npm test`, lint, build, tsc; existing API/browser suites re-run against the new UI.
+- Real-browser QA (desktop + 390px mobile, light/dark): every flow, nav/sidebar/bottom tabs, dialogs/toasts/skeletons, charts, filters, admin guards, register/login/logout; no console/server errors.
+- PWA QA: manifest/icons, SW registration, offline reload, cache inspection (no API/account data), update flow, iOS instructions, standalone metadata; Lighthouse for performance/accessibility (PWA behavior verified by browser automation/DevTools).
+- Docker build/run + Railway deploy; live probes (`/login` 200, `/` 307, API 401, manifest/SW/icons 200, HTTPS); verify installability on the live URL. Restore the dev DB to its prior state.
+- Docs: README UI tour + PWA install/offline privacy note; `deployment_plan.md` deploy/update note; Work Log + QA section. Any real defect becomes T41+ with repro/acceptance.
+- **Acceptance criteria:** all gates green; browser + PWA matrices logged pass/fail; live deployment verified; no account data cached; docs and status updated.
+
+---
+
 ### 9. Definition of done (every task)
 
 - All acceptance criteria met.
 - `npm run build` and `npm run lint` pass; `npm test` passes once tests exist.
 - Data persists across a server restart; no unhandled console/server errors.
+- UI/PWA tasks: both themes and a 390px mobile viewport checked; PWA work verified against a production build (`next build && next start`), **never** `next dev`.
 - Task status, Work Log, and **Next up** updated in this file (§10).
 - (Recommended) one git commit: `Txx: <title>`.
 
@@ -522,7 +622,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 
 1. Set the task's **Status** to ✅ DONE (or ⛔ BLOCKED with a one-line reason).
 2. Update **Next up** at the top to the first task that is not ✅ and whose dependencies are all ✅.
-3. Update **Progress:** (Phase 1 `done/20` · Phase 2 `done/12`) and **Last updated:** date.
+3. Update **Progress:** (Phase 1 `done/20` · Phase 2 `done/13` · Phase 3 `done/7`) and **Last updated:** date.
 4. Append a row to the **Work Log** (§11): date · task · agent · 1–3 line summary · key files.
 5. Log any judgment calls in the **Agent decision log** (§12). If a call contradicts §3, STOP and add it to §13 Open questions instead.
 6. Keep this file the single source of truth — do not create parallel tracking docs.
@@ -569,6 +669,7 @@ Rule: never start a task whose dependencies are not ✅. If a task turns out big
 | 2026-10-17 | T33 | Full-stack Developer | Round-3 QA defect fixes: BUG-QA-04 — post-sign-in `window.location.replace("/")` (bypasses the poisoned router cache) + `prefetch={false}` on the AuthCard brand link; BUG-QA-03 — new `useHydrated()` keeps both auth submits disabled until hydration + `method="post"` native fallback (pre-hydration Enter POSTs to the page route, URL clean); BUG-QA-05 — triaged, accepted + documented (fork's prod streaming, `no-store`, no protected content; README + layout comment). Evidence: 87/87 tests · lint/build/tsc green · dev checks 16/16 · production standalone: soft-redirect form confirmed, credential-safe native POST + SSR form facts · Edge-headless replay 6/6 (G2 + A13). DB fresh-empty. Commit `7827dd4`. |
 | 2026-10-17 | T33 (QA round 4) | Senior QA | Re-verification on `7827dd4`: gates **87/87 · lint clean · build green (21/21)**; API **199/199** dev · **192 + 7 documented (BUG-QA-05)** image; browser **81/81 dev · 81/81 image — 0 KNOWN-BUG** (`A13*`/`G2` xfails promoted to hard assertions; new `A13c`/`A13d` SSR facts + `G2b` prefetch check). **BUG-QA-03/04 verified fixed and closed; BUG-QA-05 accepted-as-documented with QA concurrence** — soft-redirect body re-probed (`no-store`, 0 password inputs), signed-out `/` hard 307. Incidental: zombie-`<main>` observation O3 obsolete (`C1d` 1/1). Infra: the first image-API run was **voided** by a stale `:3001` next-server (T33 session leftover) → reclaimed + targeting proven (`probe-which-db.sh`) + re-run. Final: dev DB 0/0/0/0 · server stopped · Docker artifacts removed · ports free. Docs committed. |
 | 2026-10-19 | Deploy | Infra Agent | **Live:** https://savings-tracker-production-e934.up.railway.app — Railway Free (project `precious-hope`, service `savings-tracker`, volume `savings-tracker-volume` @ `/app/data` 500 MB, serverless on, region iad). Dockerfile `VOLUME` instruction removed (Railway bans the keyword during build validation; storage attaches at runtime). Verified: gates re-run 87/87 · lint · build; live probes `/login` 200 · `/` 307 · API 401; first-signup admin `zanesonsona`; throwaway registration → PENDING → rejected by admin → login 403 "declined" (approval flow e2e); restart test boot **2→3** ("No pending migrations to apply") → DB persisted on the volume; first backups downloaded + `integrity_check=ok` (pre- and post-restart). Backup script `~/savings-backups/backup.sh` (tested, keeps 14 newest). Docs: `deployment_plan.md` v3. Commits `60ab2e5`, `fc09bb4`, `df122a3`. |
+| 2026-10-21 | PM | Project Manager | PM v3: added **Phase 3 — UI refresh & PWA** (T34–T40): design tokens/shared primitives, responsive app shell, dashboard 2.0 + additive 6-month trend API, page refresh with modal/sheet forms + toasts, installable PWA, offline fallback without caching financial data, QA/deploy. New user-confirmed decisions D22–D26; scope, API contract, business rules and DoD updated. Next up: **T34**. |
 
 ### 12. Agent decision log (provisional)
 
@@ -634,6 +735,7 @@ _Append runtime judgment calls here (format: `YYYY-MM-DD · Txx · decision · r
 - **Q6 — Admin bootstrap:** ✅ **Answered 2026-10-17 — first sign-up becomes Admin** (auto-approved); later registrations need approval. → D15 / T23.
 - **Q7 — Data scope per account:** ✅ **Answered 2026-10-17 — everything separate per account**; the Admin never sees other accounts' money data. → D16 / T21 + T26.
 - **Q8 — Account rules (defaults):** username 3–30 chars, unique case-insensitively; password ≥ 8 chars (D14). Override here if you want different rules.
+- **Q9 — Phase 3 direction (UI + PWA):** ✅ **Answered 2026-10-21** — refined-fintech UI, allocation donut + 6-month trend, modal/sheet add-forms, installable PWA with **offline fallback only** (no financial data cached), fixed mobile bottom tabs. → D22–D26 / T34–T40.
 
 ---
 
