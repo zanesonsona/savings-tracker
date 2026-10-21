@@ -1,20 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, ViewTransition } from "react";
 import EmptyState from "@/components/EmptyState";
+import FormDialog from "@/components/FormDialog";
+import IncomeForm from "@/components/IncomeForm";
+import PageHeader from "@/components/PageHeader";
+import { SkeletonList } from "@/components/Skeleton";
+import { useConfirm } from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toaster";
 import { apiFetch } from "@/lib/api";
 import { splitIncome } from "@/lib/allocation";
 import { monthLabel } from "@/lib/dates";
-import { formatCents, toCents } from "@/lib/money";
+import { ArrowDownLeft, Plus, Tags, Trash2, Wallet } from "@/lib/icons";
+import { formatCents } from "@/lib/money";
 import type { CategoryDTO, IncomeDTO } from "@/lib/types";
-import { useToday } from "@/lib/use-today";
-
-const INPUT_CLASS = "field";
-
-const BUTTON_PRIMARY = "btn-primary";
-
-const BUTTON_DANGER = "btn-danger";
 
 /** "2026-10-01T00:00:00.000Z" → "Oct 1" (UTC parts — never shifts, D13). */
 function shortDate(iso: string): string {
@@ -32,16 +32,10 @@ export default function IncomePage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const reload = () => setRefreshKey((key) => key + 1);
 
-  const today = useToday();
-  const [amount, setAmount] = useState("");
-  const [source, setSource] = useState("");
-  // `null` = untouched (falls back to local today); "" = cleared by the user.
-  const [date, setDate] = useState<string | null>(null);
-  const [note, setNote] = useState("");
-  const dateValue = date ?? today;
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
     let cancelled = false;
@@ -69,57 +63,24 @@ export default function IncomePage() {
     };
   }, [refreshKey]);
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFormError(null);
-
-    let amountCents: number;
-    try {
-      amountCents = toCents(amount);
-    } catch {
-      setFormError("Enter a valid amount, e.g. 1234.56");
-      return;
-    }
-    if (amountCents <= 0) {
-      setFormError("Amount must be greater than zero.");
-      return;
-    }
-    if (!dateValue) {
-      setFormError("Pick a date.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await apiFetch<IncomeDTO>("/api/incomes", {
-        method: "POST",
-        body: JSON.stringify({
-          amountCents,
-          source: source.trim() || undefined,
-          date: dateValue,
-          note: note.trim() || undefined,
-        }),
-      });
-      setAmount("");
-      setSource("");
-      setNote("");
-      reload();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Failed to save income");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function handleDelete(income: IncomeDTO) {
     const label = `${formatCents(income.amountCents)} on ${income.date.slice(0, 10)}`;
-    if (!window.confirm(`Delete income of ${label}?`)) return;
+    const confirmed = await confirm({
+      title: "Delete income?",
+      description: `This permanently removes ${label}. The category split for this entry will disappear too.`,
+      confirmLabel: "Delete income",
+    });
+    if (!confirmed) return;
+
     setActionError(null);
     try {
       await apiFetch(`/api/incomes/${income.id}`, { method: "DELETE" });
+      toast({ tone: "success", title: "Income deleted", description: label });
       reload();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to delete income");
+      const message = err instanceof Error ? err.message : "Failed to delete income";
+      setActionError(message);
+      toast({ tone: "error", title: "Could not delete income", description: message });
     }
   }
 
@@ -136,61 +97,24 @@ export default function IncomePage() {
   }
 
   const hasCategories = (categories ?? []).length > 0;
+  const totalCents = (incomes ?? []).reduce((sum, income) => sum + income.amountCents, 0);
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-ink">Income</h1>
-        <p className="mt-1 text-sm text-ink-muted">
-          Log each paycheck — it is split across your categories by their percentages.
-        </p>
-      </header>
-
-      <form onSubmit={handleCreate} className="rounded-panel border border-line bg-surface p-4">
-        <h2 className="text-sm font-medium text-ink">Add income</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-[9rem_1fr_10rem_auto]">
-          <input
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-            required
-            inputMode="decimal"
-            placeholder="Amount (e.g. 5000.00)"
-            className={INPUT_CLASS}
-            aria-label="Amount"
-          />
-          <input
-            value={source}
-            onChange={(event) => setSource(event.target.value)}
-            maxLength={60}
-            placeholder="Source (e.g. Salary)"
-            className={INPUT_CLASS}
-            aria-label="Source"
-          />
-          <input
-            type="date"
-            value={dateValue}
-            onChange={(event) => setDate(event.target.value)}
-            required
-            className={INPUT_CLASS}
-            aria-label="Date"
-          />
-          <button type="submit" disabled={saving} className={BUTTON_PRIMARY}>
-            {saving ? "Saving…" : "Add income"}
+      <PageHeader
+        title="Income"
+        description="Log each paycheck — it is split across your categories by their percentages."
+        actions={
+          <button type="button" onClick={() => setFormOpen(true)} className="btn-primary">
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            Add income
           </button>
-        </div>
-        <input
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          maxLength={200}
-          placeholder="Note (optional)"
-          className={`${INPUT_CLASS} mt-3 w-full`}
-          aria-label="Note"
-        />
-        {formError ? <p className="mt-2 alert-danger">{formError}</p> : null}
-      </form>
+        }
+      />
 
       {!hasCategories && categories !== null ? (
         <EmptyState
+          icon={Tags}
           title="No categories yet"
           description="Income can only be split once you create categories (e.g., Bills, Needs, Debts, Savings)."
           actionHref="/categories"
@@ -204,93 +128,164 @@ export default function IncomePage() {
         loadError ? (
           <p className="alert-danger">{loadError}</p>
         ) : (
-          <p className="text-sm text-ink-muted">Loading…</p>
+          <SkeletonList label="Loading income…" rows={4} />
         )
       ) : incomes.length === 0 ? (
         <EmptyState
+          icon={ArrowDownLeft}
           title="No income yet"
-          description="Add your first paycheck above and you will see how it splits across your categories."
+          description="Add your first paycheck and you will see how it splits across your categories."
         />
       ) : (
-        <div className="space-y-6">
-          {groups.map((group) => (
-            <section key={group.month}>
-              <h2 className="mb-2 text-sm font-medium text-ink-muted">
-                {monthLabel(group.month)}
-              </h2>
-              <ul className="divide-y divide-line rounded-panel border border-line bg-surface">
-                {group.items.map((income) => {
-                  const split = splitIncome(
-                    income.amountCents,
-                    (categories ?? []).map((c) => ({ id: c.id, percentage: c.percentage })),
-                  );
-                  const categoryById = new Map((categories ?? []).map((c) => [c.id, c]));
-                  return (
-                    <li key={income.id} className="p-4">
-                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="text-sm font-medium text-ink">
-                          {shortDate(income.date)}
-                        </span>
-                        <span className="text-sm text-ink">
-                          {income.source ?? "No source"}
-                        </span>
-                        {income.note ? (
-                          <span className="text-sm text-ink-muted">{income.note}</span>
-                        ) : null}
-                        <span className="ml-auto font-medium text-ink">
-                          {formatCents(income.amountCents)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(income)}
-                          className={BUTTON_DANGER}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {!hasCategories ? (
-                          <Link href="/categories" className="text-xs text-ink-muted underline">
-                            Create categories to see the split
-                          </Link>
-                        ) : (
-                          <>
-                            {split.allocations
-                              .filter((allocation) => allocation.amountCents > 0)
-                              .map((allocation) => {
-                                const category = categoryById.get(allocation.categoryId);
-                                return (
-                                  <span
-                                    key={allocation.categoryId}
-                                    className="badge badge-neutral gap-1.5"
-                                  >
-                                    <span
-                                      className="h-2 w-2 rounded-full"
-                                      style={{ backgroundColor: category?.color ?? "#94a3b8" }}
-                                    />
-                                    {category?.name ?? "…"}
-                                    <span className="font-medium">
-                                      {formatCents(allocation.amountCents)}
-                                    </span>
-                                  </span>
-                                );
-                              })}
-                            {split.unallocatedCents > 0 ? (
-                              <span className="badge bg-line text-ink-muted">
-                                Unallocated {formatCents(split.unallocatedCents)}
+        <>
+          <section className="card flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-control bg-brand-soft text-brand">
+                <Wallet aria-hidden="true" className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">
+                  Total income logged
+                </p>
+                <p className="money text-xl font-semibold text-ink">{formatCents(totalCents)}</p>
+              </div>
+            </div>
+            <span className="badge badge-neutral">
+              {incomes.length === 1 ? "1 entry" : `${incomes.length} entries`}
+            </span>
+          </section>
+
+          <div className="space-y-6">
+            {groups.map((group) => {
+              const groupTotal = group.items.reduce((sum, item) => sum + item.amountCents, 0);
+              return (
+                <section key={group.month}>
+                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 className="text-sm font-semibold text-ink-muted">
+                      {monthLabel(group.month)}
+                    </h2>
+                    <span className="money text-xs text-ink-muted">
+                      {formatCents(groupTotal)}
+                    </span>
+                  </div>
+                  <ul className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-surface">
+                    {group.items.map((income) => {
+                      const split = splitIncome(
+                        income.amountCents,
+                        (categories ?? []).map((category) => ({
+                          id: category.id,
+                          percentage: category.percentage,
+                        })),
+                      );
+                      const categoryById = new Map(
+                        (categories ?? []).map((category) => [category.id, category]),
+                      );
+                      const label = `${formatCents(income.amountCents)} on ${income.date.slice(0, 10)}`;
+                      return (
+                        <ViewTransition key={income.id} enter="auto" exit="auto">
+                          <li className="p-4 transition-colors hover:bg-surface-muted/60">
+                            <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+                              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
+                                <ArrowDownLeft aria-hidden="true" className="h-4 w-4" />
                               </span>
-                            ) : null}
-                          </>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
-        </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                  <span className="text-sm font-semibold text-ink">
+                                    {income.source ?? "No source"}
+                                  </span>
+                                  <span className="text-xs text-ink-muted">
+                                    {shortDate(income.date)}
+                                  </span>
+                                  {income.note ? (
+                                    <span className="text-sm text-ink-muted">· {income.note}</span>
+                                  ) : null}
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {!hasCategories ? (
+                                    <Link
+                                      href="/categories"
+                                      className="text-xs text-ink-muted underline underline-offset-2"
+                                    >
+                                      Create categories to see the split
+                                    </Link>
+                                  ) : (
+                                    <>
+                                      {split.allocations
+                                        .filter((allocation) => allocation.amountCents > 0)
+                                        .map((allocation) => {
+                                          const category = categoryById.get(allocation.categoryId);
+                                          return (
+                                            <span
+                                              key={allocation.categoryId}
+                                              className="badge badge-neutral gap-1.5"
+                                            >
+                                              <span
+                                                aria-hidden="true"
+                                                className="h-2 w-2 rounded-full"
+                                                style={{
+                                                  backgroundColor:
+                                                    category?.color ?? "var(--chart-other)",
+                                                }}
+                                              />
+                                              {category?.name ?? "…"}
+                                              <span className="money font-medium">
+                                                {formatCents(allocation.amountCents)}
+                                              </span>
+                                            </span>
+                                          );
+                                        })}
+                                      {split.unallocatedCents > 0 ? (
+                                        <span className="badge bg-line text-ink-muted">
+                                          Unallocated {formatCents(split.unallocatedCents)}
+                                        </span>
+                                      ) : null}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="ml-auto flex items-center gap-1.5">
+                                <span className="money text-sm font-semibold text-ink">
+                                  {formatCents(income.amountCents)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(income)}
+                                  aria-label={`Delete income of ${label}`}
+                                  title="Delete income"
+                                  className="icon-button hover:bg-danger-soft hover:text-danger"
+                                >
+                                  <Trash2 aria-hidden="true" className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </li>
+                        </ViewTransition>
+                      );
+                    })}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
+        </>
       )}
+
+      <FormDialog
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title="Add income"
+        description="Log a paycheck, refund or any money coming in."
+      >
+        <IncomeForm
+          onCancel={() => setFormOpen(false)}
+          onSaved={() => {
+            setFormOpen(false);
+            reload();
+          }}
+        />
+      </FormDialog>
+
+      {dialog}
     </div>
   );
 }

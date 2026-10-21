@@ -56,6 +56,16 @@ export function monthLabel(month: string): string {
   });
 }
 
+/** "YYYY-MM" → compact chart label, e.g. "Oct ’26". */
+export function shortMonthLabel(month: string): string {
+  const { start } = parseMonth(month);
+  const monthName = start.toLocaleDateString(APP_LOCALE, {
+    month: "short",
+    timeZone: "UTC",
+  });
+  return `${monthName} ’${String(start.getUTCFullYear()).slice(-2)}`;
+}
+
 /** Current month as "YYYY-MM", from UTC parts (consistent with stored UTC dates). */
 export function currentMonth(now: Date = new Date()): string {
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;

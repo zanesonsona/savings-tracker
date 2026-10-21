@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { currentMonth, formatDate, monthLabel, parseDate, parseMonth, shiftMonth } from "./dates";
+import {
+  currentMonth,
+  formatDate,
+  monthLabel,
+  parseDate,
+  parseMonth,
+  shiftMonth,
+  shortMonthLabel,
+} from "./dates";
 
 describe("parseMonth", () => {
   it("returns the UTC [start, end) range", () => {
@@ -44,6 +52,13 @@ describe("formatDate", () => {
 describe("monthLabel", () => {
   it("produces a human label", () => {
     expect(monthLabel("2026-10")).toBe("October 2026");
+  });
+});
+
+describe("shortMonthLabel", () => {
+  it("produces a compact chart label with the two-digit year", () => {
+    expect(shortMonthLabel("2026-10")).toBe("Oct ’26");
+    expect(shortMonthLabel("2027-01")).toBe("Jan ’27");
   });
 });
 

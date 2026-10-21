@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCents, toCents } from "./money";
+import { currencySymbol, formatCents, toCents } from "./money";
 
 describe("toCents", () => {
   it("converts decimal strings to integer cents", () => {
@@ -44,5 +44,9 @@ describe("formatCents", () => {
 
   it("formats negative amounts", () => {
     expect(formatCents(-800)).toBe("-₱8.00");
+  });
+
+  it("exposes the currency symbol for compact form prefixes", () => {
+    expect(currencySymbol()).toBe("₱");
   });
 });

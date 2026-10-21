@@ -3,15 +3,17 @@
 A local web app to plan and track your money: create an account, log your income, split it automatically across **your own custom categories** (e.g., Bills, Needs, Debts, Savings) by the percentages you define, then record real expenses and savings deposits/withdrawals and compare plan vs actual on a dashboard.
 
 - **Income splitting** — each income is split live across categories with the largest-remainder method, in whole cents (Σ% ≤ 100; the leftover shows as "Unallocated").
-- **Plan vs actual** — dashboard with allocated/actual/remaining per category, progress bars, and over-budget highlighting.
+- **Dashboard 2.0** — wallet-balance hero, income/spent/net-saved/savings stat cards with month-over-month deltas, allocation donut, 6-month income-vs-spent trend, and per-category plan-vs-actual cards with over-budget highlighting.
 - **Savings** — deposits/withdrawals on savings-kind categories with an all-time running balance (negative balances are allowed and shown in red).
 - **Wallet balance** — all-time cash on hand (income − spent − savings net) on the dashboard, next to the savings balance.
 - **Category filters** — multi-select, OR-combined toggle chips on the Expenses, Savings and Dashboard tabs; all-time balances and dashboard cards stay account-wide.
-- **Night mode** — Light / Dark / System switch in the nav (and on the sign-in/register cards), persisted in `localStorage` (`st-theme`) and applied by a tiny inline script before first paint — no flash on reload.
+- **Responsive app shell** — a desktop sidebar and a fixed mobile bottom tab bar; add-forms open as a centered modal on desktop and a bottom sheet on phones. Styled confirm dialogs, toasts, skeleton loaders and reduced-motion-safe transitions replace the old browser prompts and text loading states.
+- **Night mode** — Light / Dark / System switch in the sidebar/mobile menu (and on the sign-in/register cards), persisted in `localStorage` (`st-theme`) and applied by a tiny inline script before first paint — no flash on reload.
 - **Accounts with admin approval** — the first account becomes the admin; later registrations wait for approval, and every account — the admin included — only ever sees its own data. One SQLite file, no cloud.
+- **Installable PWA + offline fallback** — a web app manifest, 192/512/maskable/Apple icons, an install button in the sidebar/mobile menu, and a production-only service worker that shows a branded `/offline` page when the network is down. The service worker **never caches API responses, HTML/RSC or account data** — only the offline page, PWA icons, manifest and hashed static assets.
 - **Ships empty by design** — no preset users, categories, or demo data; the first account you register becomes the admin, then you create your own buckets.
 
-**Contents:** [Setup](#setup) · [Usage](#usage-first-run-walkthrough) · [Demo data](#optional-demo-data-dev-only) · [Configuration](#configuration) · [API reference](#api-reference) · [Docker](#run-with-docker) · [Scripts](#scripts) · [Architecture](#architecture-map) · [Testing](#testing)
+**Contents:** [Setup](#setup) · [Usage](#usage-first-run-walkthrough) · [UI tour](#ui-tour) · [Install as an app](#install-as-an-app-pwa) · [Demo data](#optional-demo-data-dev-only) · [Configuration](#configuration) · [API reference](#api-reference) · [Docker](#run-with-docker) · [Scripts](#scripts) · [Architecture](#architecture-map) · [Testing](#testing)
 
 ## Tech stack
 
@@ -21,6 +23,8 @@ A local web app to plan and track your money: create an account, log your income
 | Styling | Tailwind CSS v4 (semantic token layer; light/dark themes) |
 | Database | SQLite via Prisma 6 (`@prisma/client`) |
 | Validation | zod (all API request bodies/params) |
+| PWA | Web app manifest + generated PNG icons; hand-written service worker + `/offline` fallback (production only, cache-safe) |
+| Icons | `lucide-react` (the only Phase 3 runtime dependency added) |
 | Tests | vitest (money/allocation/date/wallet/validation/auth helpers + route-level tests: category guards, session + per-account isolation, admin approvals) |
 
 ## Prerequisites
@@ -44,12 +48,36 @@ The app starts **empty** (no users, no categories, no entries) — the first acc
 
 1. **Create an account** — open `/register`. The first account ever created becomes the app **admin** and is approved immediately; every later account lands as **pending** until an admin approves it at `/admin/users` — pending and declined accounts cannot sign in. Sign in at `/login`; the session lasts 30 days (httpOnly `st_session` cookie, signed with `SESSION_SECRET`). Each account only ever sees its own data — the admin included.
 2. **Create your categories** — open `/categories` (or the onboarding link on the dashboard). For each category set a name, a kind (**Expense** for spending buckets, **Savings** for savings buckets), a percentage of income, and an optional color. The running total must stay at or below **100%** per account; anything below 100% shows as **Unallocated** and is assigned to no category.
-3. **Log income** — open `/income`. Enter an amount (e.g. `5000.00`), an optional source, a date, and an optional note. Every income row shows its computed split across your categories (plus an *Unallocated* chip when Σ% < 100%).
-4. **Log expenses** — open `/expenses`. Expenses can only be filed against Expense-kind categories. Filter by month and categories (toggle chips — **Clear** resets; multi-select is OR-combined); the list and live total follow the active filters.
+3. **Log income** — open `/income` and press **Add income**. The form opens as a centered modal on desktop and a bottom sheet on phones. Enter an amount (e.g. `5000.00`), an optional source, a date and an optional note. Every income row shows its computed split across your categories (plus an *Unallocated* chip when Σ% < 100%).
+4. **Log expenses** — open `/expenses` and press **Add expense**. Expenses can only be filed against Expense-kind categories. Filter by month and categories (toggle chips — **Clear** resets; multi-select is OR-combined); the list and live total follow the active filters.
 5. **Track savings** — open `/savings`. Record deposits and withdrawals against Savings-kind categories. The balance card shows the **all-time** net (red when negative) and the month's net; multi-select filters narrow the list and the month's net, while the balance stays account-wide.
-6. **Read the dashboard** — open `/` (Dashboard). Pick a month and compare allocated vs actual per category, with Income / Spent / Net saved / **Wallet balance** summary cards plus the all-time savings balance. Category chips filter the rows below; the cards stay unchanged.
-7. **Fix mistakes by deleting** — entries are **create + delete only** (no editing in the MVP). Deleting an income/expense/savings entry is always allowed; deleting a category is blocked while it still has entries, and changing a category's kind is blocked while entries of its current kind exist. Allocations are recomputed live from the current percentages, so changing a % re-computes the plan for every month.
-8. **Pick a theme** — the nav has a **Light / Dark / System** switch (the default is System, i.e. your OS preference). The choice is saved in `localStorage` under `st-theme` and re-applied before the first paint on every load, so reloads never flash the wrong theme.
+6. **Read the dashboard** — open `/` (Dashboard). The hero shows your **wallet balance**; stat cards show income, spent, net saved and the all-time savings balance with month-over-month deltas. Below are the allocation donut, a 6-month income-vs-spent trend and per-category plan-vs-actual cards. Pick a month with **‹ / Today / ›**, and use the category chips to filter the category rows — the cards, donut and trend stay account-wide.
+7. **Fix mistakes by deleting** — entries are **create + delete only** (no editing in the MVP). Deleting an income/expense/savings entry is always allowed (with a styled confirm dialog); deleting a category is blocked while it still has entries, and changing a category's kind is blocked while entries of its current kind exist. Allocations are recomputed live from the current percentages, so changing a % re-computes the plan for every month.
+8. **Pick a theme** — the sidebar or mobile overflow menu has a **Light / Dark / System** switch (the default is System, i.e. your OS preference). The choice is saved in `localStorage` under `st-theme` and re-applied before the first paint on every load, so reloads never flash the wrong theme.
+9. **Install and go offline** — use **Install app** in the sidebar/mobile menu (or the browser's install icon). Once installed, opening the app while offline shows the branded `/offline` page with a **Try again** button; see [Install as an app](#install-as-an-app-pwa) for the cache/privacy details.
+
+## UI tour
+
+- **Shell** — on desktop (`lg+`) a fixed emerald-accented sidebar holds the brand, the five destinations, the Admin link (admins only), **Install app**, the theme switch and your username / **Log out**. On phones and tablets the sidebar collapses to a compact top bar plus a fixed five-tab bottom bar with safe-area padding; the overflow menu holds admin/install/theme/logout.
+- **Dashboard** — wallet-balance hero, four stat cards with month-over-month deltas, allocation donut with legend, 6-month income-vs-spent bars (each chart has an accessible table fallback), and category cards with plan %, remaining/over and an On track / Near limit / Over badge. The month picker and filter chips sit in the page header.
+- **Income / Expenses / Savings** — responsive list rows with tabular amounts, category colour dots/badges, month history and multi-select filters. **Add** opens a centered modal on desktop or a bottom sheet on mobile; validation errors stay inline, success shows a toast, and Escape/backdrop closes with focus returned to the trigger.
+- **Categories** — inline create/edit rows, percentage total + Unallocated indicator, usage counts and delete blocking. **Admin** — pending registrations first with Approve / Reject confirms, then approved/declined groups.
+- **Auth** — split-screen brand panel on desktop, centered card on mobile; light/dark/system themes everywhere, with skeletons instead of text-only loading states.
+
+## Install as an app (PWA)
+
+The app ships a web app manifest (`/manifest.webmanifest`), 192/512/maskable icons, an Apple touch icon and shortcuts to Income, Expenses and Savings. In a supported browser:
+
+- **Chrome / Edge / Android** — use the **Install app** button in the sidebar (or the mobile overflow menu), or the install icon in the address bar. The app opens in a standalone window at the same URL and keeps the same sign-in.
+- **iPhone / iPad Safari** — tap **Share → Add to Home Screen**. If the browser offers no native prompt, the in-app install button shows these steps.
+- **Already installed** — the install button hides automatically when the app runs standalone or the browser reports it installed.
+
+### Offline behavior and privacy
+
+- The service worker is **registered only in production** (`next build && next start` or the Docker image) and is skipped in `next dev`.
+- It precaches only `/offline`, the PWA icons, the manifest and hashed `/_next/static/**` assets. Navigations are network-first and fall back to `/offline`; API requests, HTML/RSC payloads and cross-origin requests are never put in Cache Storage. **No account or financial data is available offline.**
+- When a new version is deployed, the open tab shows an **Update available — Refresh** toast. Refresh activates the new worker and reloads once.
+- `/offline` is public and nav-free; **Try again** returns to the dashboard when the network is back. The installed app otherwise uses the same server-rendered pages, session cookie and API routes as the browser.
 
 ## Optional: demo data (DEV ONLY)
 
@@ -261,7 +289,7 @@ Errors: `404 Category not found` for an unknown `categoryId`; `400 Savings entri
 
 ### Overview (dashboard)
 
-**`GET /api/overview`** → `200` with the full dashboard payload. `?month=YYYY-MM` is optional and defaults to the current UTC month.
+**`GET /api/overview`** → `200` with the full dashboard payload. `?month=YYYY-MM` is optional and defaults to the current UTC month. An optional `?trend=N` (integer **1–12**) adds N monthly buckets ending at the selected month; without it the payload is unchanged.
 
 ```json
 {
@@ -294,7 +322,12 @@ Errors: `404 Category not found` for an unknown `categoryId`; `400 Savings entri
   ],
   "totals": { "spentCents": 20000, "netSavedCents": 100000 },
   "walletBalanceCents": 380000,
-  "savingsBalanceCents": 100000
+  "savingsBalanceCents": 100000,
+  "trend": [
+    { "month": "2026-08", "incomeTotalCents": 0, "spentCents": 0, "netSavedCents": 0 },
+    { "month": "2026-09", "incomeTotalCents": 480000, "spentCents": 15000, "netSavedCents": 50000 },
+    { "month": "2026-10", "incomeTotalCents": 500000, "spentCents": 20000, "netSavedCents": 100000 }
+  ]
 }
 ```
 
@@ -307,7 +340,8 @@ Field semantics:
 - `totals.spentCents` — Σ actuals of all expense-kind categories; `totals.netSavedCents` — month net of all savings-kind categories.
 - `walletBalanceCents` — **all-time** cash on hand (D18): all-time income − all-time expenses − savings net (deposits − withdrawals). Withdrawals return cash to the wallet; negative is allowed and shown red; independent of `month`.
 - `savingsBalanceCents` — all-time net across all savings categories (independent of `month`).
-- The dashboard's category chips filter the category rows **client-side**; summary cards and balances always stay account-wide.
+- `trend` — present only with `?trend=N`: N buckets ending at `month`, oldest first. Each bucket has `incomeTotalCents` (Σ incomes), `spentCents` (Σ expenses) and `netSavedCents` (deposits − withdrawals) for that UTC month. Malformed or out-of-range N → `400 trend must be an integer between 1 and 12`.
+- The dashboard's category chips filter the category rows **client-side**; summary cards, the donut and the trend always stay account-wide.
 
 ### End-to-end example (curl)
 
@@ -343,7 +377,7 @@ curl -s -b cookies.txt -X POST http://localhost:3000/api/savings \
   -H 'Content-Type: application/json' \
   -d '{"amountCents":100000,"direction":"DEPOSIT","categoryId":2,"date":"2026-10-02"}'
 
-# 5. Read the dashboard payload for the month
+# 5. Read the dashboard payload for the month (add &trend=6 for the chart buckets)
 curl -s -b cookies.txt "http://localhost:3000/api/overview?month=2026-10"
 ```
 
@@ -364,6 +398,7 @@ docker run --rm -p 3000:3000 \
 - Multi-stage image built on Next.js **standalone output**; the container applies pending Prisma migrations automatically on startup and runs as the non-root `node` user.
 - The SQLite database is created at `/app/data/dev.db` **inside the container** (override with the `DATABASE_URL` env var); the `savings-data` volume keeps it across restarts and upgrades. A fresh volume starts **empty** — register the first account (it becomes the admin), then create your categories.
 - **Page-redirect note (T33/BUG-QA-05):** in production builds, page-level `redirect()`s (e.g. a signed-in visitor opening `/login`, or a stale session opening an app page) can arrive as `200` + a client-executed `NEXT_REDIRECT` instead of a hard `307` — the fork's postponed/prerender streaming flushes the shell first. The responses are `no-store`, contain **no protected content**, and browsers still land on the target route; the dev server and all JSON APIs keep hard status codes. `/login` and `/register` also keep credentials out of the URL (`method="post"` fallback + submit disabled until hydration).
+- **PWA in the container:** the image runs with `NODE_ENV=production`, so the service worker is registered and `/manifest.webmanifest` + `/icons/*` are served. Installability and `Secure` cookies require **HTTPS** (`http://localhost` is treated as a secure context by browsers for local testing). The service worker caches only the offline shell, icons, manifest and hashed static assets — restarting or redeploying the container triggers the in-app **Update available — Refresh** flow on the next visit.
 - To reset the data: stop the container and run `docker volume rm savings-data`.
 
 ## Scripts
@@ -384,18 +419,20 @@ docker run --rm -p 3000:3000 \
 
 ```
 app/
-  layout.tsx            root layout — metadata + the no-FOUC theme script
-  globals.css           T30/T31 token layer: semantic CSS variables, `.dark` overrides, shared component classes
-  icon.svg              app icon (tab favicon)
-  (app)/                signed-in area (URLs unchanged; layout = Nav + secure session guard)
+  layout.tsx            root layout — metadata/viewport, no-FOUC theme script, ToastProvider, PwaRegister
+  globals.css           token layer: semantic CSS variables, emerald brand, `.dark` overrides, shared component classes
+  icon.svg              app icon (tab favicon; source for the PWA PNGs)
+  manifest.ts           web app manifest (standalone, shortcuts, 192/512/maskable/Apple icons)
+  offline/page.tsx      public, nav-free offline fallback with Try again
+  (app)/                signed-in area (URLs unchanged; layout = AppShell + secure session guard)
     layout.tsx          re-reads the session from the DB; missing/non-APPROVED → /login
-    page.tsx            Dashboard (month picker, summary cards, per-category plan vs actual)
-    income/page.tsx     Income list with split preview chips
-    expenses/page.tsx   Expenses with month + category filters
-    savings/page.tsx    Savings balance, deposits/withdrawals history
-    categories/page.tsx Create/edit/delete categories, Σ% indicator
+    page.tsx            Dashboard 2.0: wallet hero, stat cards, donut, 6-month trend, category cards
+    income/page.tsx     Income list with split chips; Add income in a modal/bottom sheet
+    expenses/page.tsx   Expenses with month + multi-select category filters; Add expense dialog
+    savings/page.tsx    Savings balance + deposits/withdrawals; Add entry dialog
+    categories/page.tsx Inline create/edit/delete categories + Σ% indicator
     admin/users/page.tsx Admin-only approvals + member list (pending first, grouped by status)
-  (auth)/               signed-out chrome (centered card, no nav)
+  (auth)/               signed-out split-screen chrome (centered card on mobile)
     login/page.tsx      Sign-in form
     register/page.tsx   Registration form (admin-vs-pending success states)
   api/
@@ -405,38 +442,64 @@ app/
     incomes/            GET (?month=)/POST + DELETE [id]
     expenses/           GET (?month=&categoryIds=)/POST + DELETE [id]   (EXPENSE categories only)
     savings/            GET (?month=&categoryIds= → entries + balance + month net)/POST + DELETE [id]
-    overview/           GET (?month=) → dashboard aggregation payload (session account only)
-proxy.ts                cookie-only optimistic redirects for app routes (Next 16 proxy; no DB)
+    overview/           GET (?month=&trend=1–12) → dashboard aggregation + optional trend buckets
+  proxy.ts              cookie-only optimistic redirects for app routes (Next 16 proxy; no DB)
 lib/
   auth.ts               scrypt password hashing, session token sign/verify, cookie helpers, requireUser/requireAdmin
   constants.ts          APP_CURRENCY / APP_LOCALE (money formatting switches)
-  money.ts              integer-cent parsing/formatting (toCents/formatCents)
+  money.ts              integer-cent parsing/formatting (toCents/formatCents/currencySymbol)
   allocation.ts         splitIncome — largest-remainder split, integer cents
   wallet.ts             walletBalanceCents — all-time cash-on-hand formula (D18)
-  dates.ts              UTC calendar-date helpers (parse/format month & day)
+  dates.ts              UTC calendar-date helpers (parse/format month & day, compact chart labels)
   validation.ts         zod schemas shared by all API routes
-  types.ts              API DTO types + Prisma→DTO mappers
+  types.ts              API DTO types + Prisma→DTO mappers (incl. OverviewTrendPoint)
   prisma.ts             PrismaClient singleton (survives dev hot-reload)
   api.ts                tiny fetch helper surfacing `{ error }` messages
+  icons.ts              curated lucide-react icon vocabulary
   use-today.ts          client-only "today" (SSR-safe via useSyncExternalStore)
   use-current-month.ts  client-only "current month" (same pattern)
   use-hydrated.ts       hydration flag — auth submits stay disabled until JS is ready (T33)
+  use-online.ts         online/offline store for OfflineBanner
 components/
-  AuthCard.tsx          centered card shell for the auth pages
+  AppShell.tsx          desktop sidebar + mobile top bar/bottom tabs; install/theme/logout slots
+  Nav.tsx               nav destinations + admin-only link, active-pill state
+  PageHeader.tsx        shared title/description/actions header
+  StatCard.tsx          icon + label + value + delta card
+  AllocationDonut.tsx   hand-rolled SVG donut with legend + sr-only table
+  TrendChart.tsx        6-month grouped bars with accessible summary/table
+  Skeleton.tsx          skeleton loaders (no text-only "Loading…")
+  Toaster.tsx           ToastProvider/useToast portal (role=region/status/alert)
+  ConfirmDialog.tsx     native <dialog> confirm + useConfirm (focus return, Escape/backdrop)
+  FormDialog.tsx        modal-on-desktop / bottom-sheet-on-mobile form shell
+  MonthPicker.tsx       prev/next/today with aria-live month label
+  IncomeForm.tsx        income create form (peso prefix, native validation)
+  ExpenseForm.tsx       expense create form (EXPENSE-kind categories)
+  SavingsForm.tsx       deposit/withdrawal form (SAVINGS-kind categories)
+  CategoryEditor.tsx    inline category create/edit rows
+  AdminUsers.tsx        admin approvals UI (pending first, Approve/Reject, member groups)
+  AuthCard.tsx          split-screen brand shell for the auth pages
   LoginForm.tsx         sign-in form (inline errors, loading state)
   RegisterForm.tsx      registration form (success states for admin vs pending)
-  AdminUsers.tsx        admin approvals UI (pending first, Approve/Reject, member groups)
-  CategoryMultiSelect.tsx toggle-chip multi-select for the Expenses/Savings/Dashboard filters (T29)
+  EmptyState.tsx        shared empty-state card with icon/action
+  CategoryMultiSelect.tsx toggle-chip multi-select for filters
   ThemeToggle.tsx       Light/Dark/System switch (localStorage `st-theme`; head script prevents FOUC)
-  Nav.tsx               session-aware nav: username, Log out, Admin link (ADMIN only)
-  EmptyState.tsx        shared empty-state card
-  ProgressBar.tsx       thin progress bar (red over 100%)
+  ProgressBar.tsx       labelled progress bar (red over 100%)
+  InstallPrompt.tsx     beforeinstallprompt store + iOS Add-to-Home-Screen instructions
+  PwaRegister.tsx       production-only SW registration + update-available toast
+  OfflineBanner.tsx     online/offline banner under the shell
+  OfflineRetry.tsx      full-navigation retry from /offline
+public/
+  sw.js                 hand-written service worker (D24 cache policy; versioned; SKIP_WAITING)
+  icons/                192/512/maskable-512/apple-touch PNGs
+scripts/
+  generate-icons.py     one-off SVG → PNG generator used for the committed icons (no sharp dependency)
 prisma/
   schema.prisma         5 models: User + Category, Income, Expense, SavingsEntry (required userId)
   migrations/           init + phase-2 migrations (applied by db:migrate / container start)
   seed.ts               DEV-ONLY demo seeder (demo admin + attached dataset)
 Dockerfile              multi-stage production image (standalone output; migrations on start)
 docker-entrypoint.sh    runs `prisma migrate deploy`, then the Next.js server
+next.config.ts          manifest/SW headers (Content-Type, no-cache, Service-Worker-Allowed)
 ```
 
 ### Data model
@@ -463,9 +526,11 @@ docker-entrypoint.sh    runs `prisma migrate deploy`, then the Next.js server
 ## Testing
 
 ```bash
-npm test                    # unit tests (money, allocation, dates, wallet, validation, auth; route guards, two-account isolation + admin approvals)
+npm test                    # 93 unit/route tests (money, allocation, dates, wallet, validation, auth; route guards, two-account isolation, admin approvals, overview trend)
 npm run lint                # ESLint
 npm run build               # type-check + production build
 ```
+
+Phase 3 QA additionally covered a production build in a real browser: **97/97 checks** across auth, dashboard, all lists, categories, admin approvals, dialogs/toasts, both themes, 320/390/768/1024/1440 layouts and PWA/offline behavior, with zero console errors. Lighthouse mobile scored **99** (login) / **96** (dashboard) performance and **100** accessibility/best-practices/SEO. Details and the full matrix live in [`Project_state.md`](./Project_state.md) → *Senior QA*.
 
 Project state, decisions, and the QA verification log live in [`Project_state.md`](./Project_state.md).

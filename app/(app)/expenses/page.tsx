@@ -1,22 +1,21 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import EmptyState from "@/components/EmptyState";
+import { useEffect, useState, ViewTransition } from "react";
 import CategoryMultiSelect from "@/components/CategoryMultiSelect";
+import { useConfirm } from "@/components/ConfirmDialog";
+import EmptyState from "@/components/EmptyState";
+import ExpenseForm from "@/components/ExpenseForm";
+import FormDialog from "@/components/FormDialog";
+import MonthPicker from "@/components/MonthPicker";
+import PageHeader from "@/components/PageHeader";
+import { SkeletonList } from "@/components/Skeleton";
+import { useToast } from "@/components/Toaster";
 import { apiFetch } from "@/lib/api";
-import { monthLabel, shiftMonth } from "@/lib/dates";
-import { formatCents, toCents } from "@/lib/money";
+import { monthLabel } from "@/lib/dates";
+import { Plus, Receipt, SearchX, Tags, Trash2 } from "@/lib/icons";
+import { formatCents } from "@/lib/money";
 import type { CategoryDTO, ExpenseDTO } from "@/lib/types";
 import { useCurrentMonth } from "@/lib/use-current-month";
-import { useToday } from "@/lib/use-today";
-
-const INPUT_CLASS = "field";
-
-const BUTTON_PRIMARY = "btn-primary";
-
-const BUTTON_SECONDARY = "btn-secondary";
-
-const BUTTON_DANGER = "btn-danger";
 
 /** "2026-10-05T00:00:00.000Z" → "Mon, Oct 5" (UTC parts — never shifts, D13). */
 function shortDate(iso: string): string {
@@ -35,22 +34,16 @@ export default function ExpensesPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const reload = () => setRefreshKey((key) => key + 1);
 
-  // Month filter: client-only default ("" until hydrated), prev/next via shiftMonth.
+  // Month filter: client-only default ("" until hydrated), prev/next via MonthPicker.
   const [monthState, setMonthState] = useState<string | null>(null);
   const clientMonth = useCurrentMonth();
   const month = monthState ?? clientMonth;
   const [categoryFilterIds, setCategoryFilterIds] = useState<number[]>([]); // [] = all categories
 
-  const today = useToday();
-  const [amount, setAmount] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  // `null` = untouched (falls back to local today); "" = cleared by the user.
-  const [date, setDate] = useState<string | null>(null);
-  const [note, setNote] = useState("");
-  const dateValue = date ?? today;
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
     if (!month) return; // wait for the client-only month value
@@ -83,64 +76,28 @@ export default function ExpensesPage() {
     };
   }, [refreshKey, month, categoryFilterIds]);
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFormError(null);
-
-    let amountCents: number;
-    try {
-      amountCents = toCents(amount);
-    } catch {
-      setFormError("Enter a valid amount, e.g. 1234.56");
-      return;
-    }
-    if (amountCents <= 0) {
-      setFormError("Amount must be greater than zero.");
-      return;
-    }
-    if (!categoryId) {
-      setFormError("Pick a category.");
-      return;
-    }
-    if (!dateValue) {
-      setFormError("Pick a date.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await apiFetch<ExpenseDTO>("/api/expenses", {
-        method: "POST",
-        body: JSON.stringify({
-          amountCents,
-          categoryId: Number(categoryId),
-          date: dateValue,
-          note: note.trim() || undefined,
-        }),
-      });
-      setAmount("");
-      setNote("");
-      reload();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Failed to save expense");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function handleDelete(expense: ExpenseDTO) {
     const label = `${expense.category.name} ${formatCents(expense.amountCents)} on ${expense.date.slice(0, 10)}`;
-    if (!window.confirm(`Delete expense ${label}?`)) return;
+    const confirmed = await confirm({
+      title: "Delete expense?",
+      description: `This permanently removes ${label}.`,
+      confirmLabel: "Delete expense",
+    });
+    if (!confirmed) return;
+
     setActionError(null);
     try {
       await apiFetch(`/api/expenses/${expense.id}`, { method: "DELETE" });
+      toast({ tone: "success", title: "Expense deleted", description: label });
       reload();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to delete expense");
+      const message = err instanceof Error ? err.message : "Failed to delete expense";
+      setActionError(message);
+      toast({ tone: "error", title: "Could not delete expense", description: message });
     }
   }
 
-  const expenseCategories = (categories ?? []).filter((c) => c.kind === "EXPENSE");
+  const expenseCategories = (categories ?? []).filter((category) => category.kind === "EXPENSE");
   const hasExpenseCategories = expenseCategories.length > 0;
 
   // Group (already newest-first) expenses by date (day).
@@ -154,11 +111,12 @@ export default function ExpensesPage() {
     }
   }
 
-  const listTotalCents = (expenses ?? []).reduce((sum, e) => sum + e.amountCents, 0);
+  const listTotalCents = (expenses ?? []).reduce((sum, expense) => sum + expense.amountCents, 0);
 
   const emptyListState =
     categories !== null && !hasExpenseCategories ? (
       <EmptyState
+        icon={Tags}
         title="No expense categories yet"
         description="Create at least one expense category (e.g., Bills, Needs) before logging expenses."
         actionHref="/categories"
@@ -166,113 +124,46 @@ export default function ExpensesPage() {
       />
     ) : categoryFilterIds.length > 0 ? (
       <EmptyState
+        icon={SearchX}
         title="No matching expenses"
         description="Nothing matches this month + category filter. Try another category or month."
       />
     ) : (
       <EmptyState
+        icon={Receipt}
         title="No expenses in this month"
         description={
           month
-            ? `Nothing logged for ${monthLabel(month)} yet. Add your first expense above.`
-            : "Add your first expense above."
+            ? `Nothing logged for ${monthLabel(month)} yet. Add your first expense.`
+            : "Add your first expense."
         }
       />
     );
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-ink">Expenses</h1>
-        <p className="mt-1 text-sm text-ink-muted">
-          Log spending against your expense categories, filtered by month and categories.
-        </p>
-      </header>
-
-      <div className="flex flex-wrap items-center gap-3 rounded-panel border border-line bg-surface p-4">
-        <button
-          type="button"
-          onClick={() => setMonthState(shiftMonth(month, -1))}
-          disabled={!month}
-          aria-label="Previous month"
-          className={BUTTON_SECONDARY}
-        >
-          ← Prev
-        </button>
-        <span className="min-w-40 text-center text-sm font-medium text-ink">
-          {month ? monthLabel(month) : "…"}
-        </span>
-        <button
-          type="button"
-          onClick={() => setMonthState(shiftMonth(month, 1))}
-          disabled={!month}
-          aria-label="Next month"
-          className={BUTTON_SECONDARY}
-        >
-          Next →
-        </button>
-        <CategoryMultiSelect
-          options={expenseCategories}
-          selected={categoryFilterIds}
-          onChange={setCategoryFilterIds}
-          hint="Filters the list and its total."
-        />
-      </div>
-
-      <form onSubmit={handleCreate} className="rounded-panel border border-line bg-surface p-4">
-        <h2 className="text-sm font-medium text-ink">Add expense</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-[9rem_1fr_10rem_auto]">
-          <input
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-            required
-            inputMode="decimal"
-            placeholder="Amount (e.g. 5000.00)"
-            className={INPUT_CLASS}
-            aria-label="Amount"
-          />
-          <select
-            value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
-            required
-            aria-label="Category"
-            className={INPUT_CLASS}
-          >
-            <option value="" disabled>
-              {hasExpenseCategories ? "Select category" : "No expense categories"}
-            </option>
-            {expenseCategories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
-            value={dateValue}
-            onChange={(event) => setDate(event.target.value)}
-            required
-            className={INPUT_CLASS}
-            aria-label="Date"
-          />
-          <button
-            type="submit"
-            disabled={saving || !hasExpenseCategories}
-            className={BUTTON_PRIMARY}
-          >
-            {saving ? "Saving…" : "Add expense"}
+      <PageHeader
+        title="Expenses"
+        description="Log spending against your expense categories, filtered by month and categories."
+        actions={
+          <button type="button" onClick={() => setFormOpen(true)} className="btn-primary">
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            Add expense
           </button>
+        }
+      />
+
+      <section className="card flex flex-col gap-3 p-3 sm:p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <MonthPicker month={month} onChange={setMonthState} />
+          <CategoryMultiSelect
+            options={expenseCategories}
+            selected={categoryFilterIds}
+            onChange={setCategoryFilterIds}
+            hint="Filters the list and its total."
+          />
         </div>
-        <input
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          maxLength={200}
-          placeholder="Note (optional)"
-          className={`${INPUT_CLASS} mt-3 w-full`}
-          aria-label="Note"
-        />
-        {formError ? <p className="mt-2 alert-danger">{formError}</p> : null}
-      </form>
+      </section>
 
       {actionError ? <p className="alert-danger">{actionError}</p> : null}
 
@@ -280,54 +171,95 @@ export default function ExpensesPage() {
         loadError ? (
           <p className="alert-danger">{loadError}</p>
         ) : (
-          <p className="text-sm text-ink-muted">Loading…</p>
+          <SkeletonList label="Loading expenses…" rows={5} />
         )
       ) : expenses.length === 0 ? (
         emptyListState
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-ink-muted">
-            {expenses.length === 1 ? "1 expense" : `${expenses.length} expenses`} · Total{" "}
-            <span className="font-medium text-ink">{formatCents(listTotalCents)}</span>
-          </p>
-          {groups.map((group) => (
-            <section key={group.date}>
-              <h3 className="mb-1.5 text-xs font-medium tracking-wide text-ink-muted uppercase">
-                {shortDate(group.date)}
-              </h3>
-              <ul className="divide-y divide-line rounded-panel border border-line bg-surface">
-                {group.items.map((expense) => (
-                  <li
-                    key={expense.id}
-                    className="flex flex-wrap items-baseline gap-x-3 gap-y-1 p-4"
-                  >
-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink">
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: expense.category.color ?? "#94a3b8" }}
-                      />
-                      {expense.category.name}
-                    </span>
-                    {expense.note ? (
-                      <span className="text-sm text-ink-muted">{expense.note}</span>
-                    ) : null}
-                    <span className="ml-auto font-medium text-ink">
-                      {formatCents(expense.amountCents)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(expense)}
-                      className={BUTTON_DANGER}
-                    >
-                      Delete
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
+          <div className="card flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+            <p className="text-sm text-ink-muted">
+              {expenses.length === 1 ? "1 expense" : `${expenses.length} expenses`} ·{" "}
+              <span className="font-medium text-ink">{month ? monthLabel(month) : ""}</span>
+            </p>
+            <p className="text-sm text-ink-muted">
+              Total{" "}
+              <span className="money font-semibold text-ink">{formatCents(listTotalCents)}</span>
+            </p>
+          </div>
+
+          {groups.map((group) => {
+            const dayTotal = group.items.reduce((sum, item) => sum + item.amountCents, 0);
+            return (
+              <section key={group.date}>
+                <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="text-xs font-semibold tracking-wide text-ink-muted uppercase">
+                    {shortDate(group.date)}
+                  </h3>
+                  <span className="money text-xs text-ink-muted">{formatCents(dayTotal)}</span>
+                </div>
+                <ul className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-surface">
+                  {group.items.map((expense) => (
+                    <ViewTransition key={expense.id} enter="auto" exit="auto">
+                      <li className="flex flex-wrap items-center gap-x-3 gap-y-2 p-4 transition-colors hover:bg-surface-muted/60">
+                        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-muted">
+                          <span
+                            aria-hidden="true"
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{
+                              backgroundColor: expense.category.color ?? "var(--chart-other)",
+                            }}
+                          />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-ink">
+                            {expense.category.name}
+                          </p>
+                          {expense.note ? (
+                            <p className="mt-0.5 text-sm text-ink-muted">{expense.note}</p>
+                          ) : null}
+                        </div>
+                        <span className="money text-sm font-semibold text-ink">
+                          {formatCents(expense.amountCents)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(expense)}
+                          aria-label={`Delete ${expense.category.name} expense of ${formatCents(
+                            expense.amountCents,
+                          )}`}
+                          title="Delete expense"
+                          className="icon-button hover:bg-danger-soft hover:text-danger"
+                        >
+                          <Trash2 aria-hidden="true" className="h-4 w-4" />
+                        </button>
+                      </li>
+                    </ViewTransition>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
         </div>
       )}
+
+      <FormDialog
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title="Add expense"
+        description="Log spending against one of your expense categories."
+      >
+        <ExpenseForm
+          categories={categories ?? []}
+          onCancel={() => setFormOpen(false)}
+          onSaved={() => {
+            setFormOpen(false);
+            reload();
+          }}
+        />
+      </FormDialog>
+
+      {dialog}
     </div>
   );
 }

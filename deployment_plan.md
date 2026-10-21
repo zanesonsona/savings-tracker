@@ -1,6 +1,7 @@
 # Deployment Plan — Savings Tracker (Free Hosting)
 
-> **Status:** ✅ **DEPLOYED** (2026-10-19) — Railway Free · `https://savings-tracker-production-e934.up.railway.app` · admin `zanesonsona` · verified backups in `~/savings-backups/`.
+> **Status:** ✅ **DEPLOYED** (2026-10-19; **Phase 3 redeploy 2026-10-21**) — Railway Free · `https://savings-tracker-production-e934.up.railway.app` · admin `zanesonsona` · verified backups in `~/savings-backups/`.
+> **v4 changelog (Phase 3):** same Railway path; the deploy now also ships the installable PWA and offline fallback. No new variables, services or volume changes. After a push, the new service worker activates through the in-app **Update available — Refresh** toast. See §5 and the 2026-10-21 rows in §9.
 > **v3 changelog:** collapsed to a **single path: Railway Free** (your call to keep things simple). Oracle/GCP/PC alternatives are kept below as fallbacks only. The exec bit + quoting quirks on Windows-vs-WSL are cosmetic, noted in §8.
 > **Who:** *You* = browser steps only (marked **you**, ~6 minutes total); *Infra agent* = everything else (marked **me**).
 > **Companion:** `Project_state.md` = single source of truth for app scope/status; this file = deployment runbook.
@@ -19,12 +20,13 @@
 
 | Item | Fact |
 |---|---|
-| App | Next.js 16 (App Router) + TypeScript + Tailwind 4; Prisma 6 → **SQLite**. PHP currency display. |
+| App | Next.js 16 (App Router) + TypeScript + Tailwind 4; Prisma 6 → **SQLite**. PHP currency display. Responsive sidebar/bottom-tab shell; Dashboard 2.0 charts. |
+| PWA / offline | `app/manifest.ts` + generated 192/512/maskable/Apple icons; production-only `public/sw.js` caches only `/offline`, icons, manifest and hashed statics — **never** `/api/**`, HTML/RSC or account data (D24). Install prompt + iOS instructions; update toast. |
 | Production artifact | **Docker image** (`Dockerfile`, multi-stage, Next `output: standalone`) — QA-verified. Runs as non-root `node`, listens on port 3000. |
 | Data | One SQLite file at **`/app/data/dev.db`** inside the container; persisted via a **Railway Volume mounted at `/app/data`** (attached at runtime — no Dockerfile `VOLUME`, which Railway bans during build validation). |
 | Startup | `docker-entrypoint.sh` applies `prisma migrate deploy` then starts the server — also creates the DB on first boot. |
 | Required env | **`SESSION_SECRET`** (production fails fast without it). `PORT=3000`, `HOSTNAME=0.0.0.0`, `DATABASE_URL=file:/app/data/dev.db` are baked into the image. |
-| Health probes | `GET /login` → 200 when signed out. `GET /` → 307 → `/login`. APIs → 401 without a session. |
+| Health probes | `GET /login` → 200 when signed out. `GET /` → 307 → `/login`. APIs → 401 without a session. `GET /manifest.webmanifest`, `/sw.js`, `/offline`, `/icons/*` → 200. |
 | Security model | First-ever registration becomes **ADMIN** automatically; later registrations wait for approval. Sessions = HMAC-signed httpOnly cookie, `Secure` in production → **HTTPS required** (Railway provides it). |
 | Known quirk | BUG-QA-05: page redirects can be soft (200 + NEXT_REDIRECT) in production. Accepted; no user impact. |
 
@@ -95,7 +97,7 @@ Everything else is baked into the image. **One Dockerfile exception (2026-10-19)
 - **CLI setup (done):** `~/.railway/bin/railway` v5.70.0 (official installer), signed in as the workspace owner, linked to project `precious-hope` → service `savings-tracker` (the link is keyed to the repo directory). SSH key `savings-cli` registered — volume file access requires it.
 - **Logs/ops:** `railway logs -d --lines 100` (deploy logs) · `railway service restart -y` — note this CLI build can exit with a timeout *after* performing the restart; confirm by a fresh `Mounting volume` / `Starting Savings Tracker on port 8080…` boot in the logs, not by the exit code.
 - **Custom domain (optional):** adding a domain you already own is **free** on Railway (automatic TLS; CNAME + TXT records). Buying the domain itself costs ~$10–15/yr — the free `*.up.railway.app` URL works identically (HTTPS + secure cookies).
-- **Updates:** push to `main` → Railway auto-redeploys (rebuild from Dockerfile; migrations run at boot). Rollback = redeploy a previous build from the Deployments menu (Free keeps 24 h of images).
+- **Updates (Phase 3):** push to `main` → Railway auto-redeploys (rebuild from Dockerfile; migrations run at boot). The open tab detects the new service worker and shows **Update available — Refresh**; Refresh activates it (`SKIP_WAITING`) and reloads once. Only `/offline`, icons, manifest and hashed static assets are cached, so **no account/financial data goes stale offline**. Rollback = redeploy a previous build from the Deployments menu (Free keeps 24 h of images).
 - **Cold boots:** first visit after ≥5–10 min idle takes 5–30 s; a rare 502 on the very first hit — retry once. This is the accepted cost of $0 + no card.
 - **Usage ceiling:** Free = $1/month credit (no rollover); if exceeded, workloads pause until the cycle resets — **volume data survives**. Light personal use projects ≈ $0.15–0.40/month of usage. Optional: email alert at the workspace Usage page.
 - **Free-tier changes:** Railway has repriced before; our portability story = Dockerfile + volume snapshot → any other Docker host in ~30 min (§6).
@@ -121,7 +123,8 @@ Everything else is baked into the image. **One Dockerfile exception (2026-10-19)
 - `deployment_plan.md` is committed to the repo (this file). No other repo changes are required for Railway.
 - The deploy build context comes from git (`.dockerignore` excludes local DB / `.env` files). The app's `.env` in the repo is **not** used in production.
 - Cosmetic quirks on this Windows/WSL workstation: git can't track the exec bit on the UNC path (the Dockerfile sets it with `chmod +x` anyway), and line endings may flip when files are edited from Windows. Neither affects builds or runtime.
-- Deploy only from committed, gate-green revisions (this session's gates: **87/87 tests, lint clean, build OK**).
+- Deploy only from committed, gate-green revisions (Phase 3 revision: **93/93 tests, lint clean, tsc clean, build OK; production-browser 97/97; API 192 PASS + 7 documented BUG-QA-05; Lighthouse 99/96 perf, 100 a11y/BP/SEO**).
+- **Phase 3 live checks:** `/login` 200 · `/` 307 · API 401 · `/manifest.webmanifest`, `/sw.js`, `/offline`, `/icons/*` 200 · manifest JSON valid · HTTPS/`Secure` cookie · SW registers and the install affordance appears in a real browser · cache contains no `/api`, RSC or account HTML.
 
 ## 9. Execution log
 

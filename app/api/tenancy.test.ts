@@ -514,3 +514,87 @@ describe("/api/overview is isolated per account", () => {
     expect(body.savingsBalanceCents).toBe(2000);
   });
 });
+
+describe("/api/overview?trend=N (T36/D25)", () => {
+  const at = (year: number, monthIndex: number, dayOfMonth: number) =>
+    new Date(Date.UTC(year, monthIndex, dayOfMonth));
+
+  function seedTrendData(): void {
+    state.incomes = [
+      { id: 101, amountCents: 1000, source: null, date: at(2025, 11, 15), note: null, createdAt: at(2025, 11, 15), userId: 1 },
+      { id: 102, amountCents: 2000, source: null, date: at(2026, 0, 15), note: null, createdAt: at(2026, 0, 15), userId: 1 },
+      { id: 103, amountCents: 3000, source: null, date: at(2026, 1, 15), note: null, createdAt: at(2026, 1, 15), userId: 1 },
+      // Bob's January income must never leak into Alice's trend.
+      { id: 104, amountCents: 9999, source: null, date: at(2026, 0, 15), note: null, createdAt: at(2026, 0, 15), userId: 2 },
+    ];
+    state.expenses = [
+      { id: 111, amountCents: 100, date: at(2025, 11, 20), note: null, createdAt: at(2025, 11, 20), userId: 1, categoryId: 11 },
+      { id: 112, amountCents: 500, date: at(2026, 1, 20), note: null, createdAt: at(2026, 1, 20), userId: 1, categoryId: 11 },
+      { id: 113, amountCents: 777, date: at(2026, 0, 20), note: null, createdAt: at(2026, 0, 20), userId: 2, categoryId: 21 },
+    ];
+    state.savings = [
+      { id: 121, amountCents: 300, direction: "DEPOSIT", date: at(2025, 11, 21), note: null, createdAt: at(2025, 11, 21), userId: 1, categoryId: 12 },
+      { id: 122, amountCents: 100, direction: "WITHDRAWAL", date: at(2026, 0, 21), note: null, createdAt: at(2026, 0, 21), userId: 1, categoryId: 12 },
+      { id: 123, amountCents: 700, direction: "DEPOSIT", date: at(2026, 1, 21), note: null, createdAt: at(2026, 1, 21), userId: 1, categoryId: 12 },
+      { id: 124, amountCents: 888, direction: "DEPOSIT", date: at(2026, 0, 21), note: null, createdAt: at(2026, 0, 21), userId: 2, categoryId: 22 },
+    ];
+  }
+
+  it("returns N buckets ending at the selected month, oldest first, zero-filled", async () => {
+    seedTrendData();
+    const res = await getOverview(jsonRequest("/api/overview?month=2026-02&trend=3", "GET"));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      month: string;
+      incomeTotalCents: number;
+      totals: { spentCents: number; netSavedCents: number };
+      trend?: { month: string; incomeTotalCents: number; spentCents: number; netSavedCents: number }[];
+    };
+
+    expect(body.month).toBe("2026-02");
+    expect(body.trend).toEqual([
+      { month: "2025-12", incomeTotalCents: 1000, spentCents: 100, netSavedCents: 300 },
+      { month: "2026-01", incomeTotalCents: 2000, spentCents: 0, netSavedCents: -100 },
+      { month: "2026-02", incomeTotalCents: 3000, spentCents: 500, netSavedCents: 700 },
+    ]);
+    // Existing month payload still reconciles with the last trend bucket.
+    expect(body.incomeTotalCents).toBe(3000);
+    expect(body.totals).toEqual({ spentCents: 500, netSavedCents: 700 });
+  });
+
+  it("trend=1 returns just the selected month; another account stays isolated", async () => {
+    seedTrendData();
+    const own = await getOverview(jsonRequest("/api/overview?month=2026-01&trend=1", "GET"));
+    const ownBody = (await own.json()) as {
+      trend?: { month: string; incomeTotalCents: number; spentCents: number; netSavedCents: number }[];
+    };
+    expect(ownBody.trend).toEqual([
+      { month: "2026-01", incomeTotalCents: 2000, spentCents: 0, netSavedCents: -100 },
+    ]);
+
+    loginAs(2);
+    const other = await getOverview(jsonRequest("/api/overview?month=2026-01&trend=1", "GET"));
+    const otherBody = (await other.json()) as {
+      trend?: { month: string; incomeTotalCents: number; spentCents: number; netSavedCents: number }[];
+    };
+    expect(otherBody.trend).toEqual([
+      { month: "2026-01", incomeTotalCents: 9999, spentCents: 777, netSavedCents: 888 },
+    ]);
+  });
+
+  it("rejects malformed or out-of-range N with 400", async () => {
+    for (const bad of ["0", "13", "abc", "1.5", "-1", ""]) {
+      const res = await getOverview(jsonRequest(`/api/overview?month=${MONTH}&trend=${bad}`, "GET"));
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({
+        error: "trend must be an integer between 1 and 12",
+      });
+    }
+  });
+
+  it("omits `trend` entirely when the parameter is absent (backward compatible)", async () => {
+    const res = await getOverview(jsonRequest(`/api/overview?month=${MONTH}`, "GET"));
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("trend");
+  });
+});

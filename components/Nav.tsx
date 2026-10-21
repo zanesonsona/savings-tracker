@@ -1,79 +1,85 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
-import ThemeToggle from "@/components/ThemeToggle";
+import { usePathname } from "next/navigation";
+import { ArrowDownLeft, LayoutDashboard, PiggyBank, Receipt, Tags } from "@/lib/icons";
 
-const LINKS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/income", label: "Income" },
-  { href: "/expenses", label: "Expenses" },
-  { href: "/savings", label: "Savings" },
-  { href: "/categories", label: "Categories" },
+const NAV_ITEMS = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/income", label: "Income", icon: ArrowDownLeft },
+  { href: "/expenses", label: "Expenses", icon: Receipt },
+  { href: "/savings", label: "Savings", icon: PiggyBank },
+  { href: "/categories", label: "Categories", icon: Tags },
 ] as const;
 
-interface NavUser {
-  username: string;
-  role: string;
+export function isActivePath(pathname: string, href: string): boolean {
+  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/** Session-aware top navigation (T25): username, Admin link for admins, log out. */
-export default function Nav({ user }: { user: NavUser }) {
+/**
+ * Primary destinations shared by the desktop sidebar and the mobile bottom
+ * tab bar (T35). The shell renders the surrounding chrome and session actions.
+ */
+export default function Nav({ variant }: { variant: "sidebar" | "bottom" }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [loggingOut, setLoggingOut] = useState(false);
 
-  const links: { href: string; label: string }[] =
-    user.role === "ADMIN" ? [...LINKS, { href: "/admin/users", label: "Admin" }] : [...LINKS];
-
-  async function handleLogout() {
-    setLoggingOut(true);
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      router.replace("/login");
-    } catch {
-      setLoggingOut(false);
-    }
+  if (variant === "bottom") {
+    return (
+      <nav
+        aria-label="Primary"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+      >
+        <ul className="grid grid-cols-5">
+          {NAV_ITEMS.map((item) => {
+            const active = isActivePath(pathname, item.href);
+            const Icon = item.icon;
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-none font-medium transition-colors after:absolute after:inset-x-5 after:top-0 after:h-0.5 after:rounded-full ${
+                    active
+                      ? "text-brand after:bg-brand"
+                      : "text-ink-muted after:bg-transparent hover:text-ink"
+                  }`}
+                >
+                  <Icon aria-hidden="true" className="h-5 w-5" strokeWidth={active ? 2.4 : 2} />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    );
   }
 
   return (
-    <header className="border-b border-line bg-surface">
-      <nav className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-        <Link href="/" className="text-lg font-semibold tracking-tight text-ink">
-          Savings Tracker
-        </Link>
-        <div className="flex flex-wrap gap-1">
-          {links.map((link) => {
-            const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`rounded-control px-3 py-1.5 text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-accent text-on-accent"
-                    : "text-ink-muted hover:bg-surface-muted hover:text-ink"
-                }`}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <ThemeToggle />
-          <span className="text-sm text-ink-muted">{user.username}</span>
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={loggingOut}
-            className="rounded-control px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+    <nav aria-label="Primary" className="flex flex-col gap-1">
+      {NAV_ITEMS.map((item) => {
+        const active = isActivePath(pathname, item.href);
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-current={active ? "page" : undefined}
+            className={`flex min-h-11 items-center gap-3 rounded-control px-3 text-sm font-medium transition-colors ${
+              active
+                ? "bg-brand-soft text-brand"
+                : "text-ink-muted hover:bg-surface-muted hover:text-ink"
+            }`}
           >
-            {loggingOut ? "Logging out…" : "Log out"}
-          </button>
-        </div>
-      </nav>
-    </header>
+            <Icon
+              aria-hidden="true"
+              className="h-5 w-5 shrink-0"
+              strokeWidth={active ? 2.3 : 2}
+            />
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

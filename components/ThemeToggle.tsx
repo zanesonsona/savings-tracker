@@ -62,7 +62,7 @@ function notify() {
  * layout applies the stored preference before first paint; this component
  * keeps the control in sync and re-applies the theme after hydration.
  */
-export default function ThemeToggle() {
+export default function ThemeToggle({ className = "" }: { className?: string }) {
   const pref = useSyncExternalStore(subscribe, readStoredPreference, () => "system");
 
   // Before paint: align <html> with the stored preference. This also restores
@@ -97,7 +97,7 @@ export default function ThemeToggle() {
     <div
       role="group"
       aria-label="Theme"
-      className="inline-flex rounded-control border border-line bg-surface p-0.5"
+      className={`inline-flex rounded-control border border-line bg-surface p-0.5 ${className}`}
     >
       {OPTIONS.map((option) => {
         const active = pref === option.value;
@@ -107,7 +107,7 @@ export default function ThemeToggle() {
             type="button"
             onClick={() => choose(option.value)}
             aria-pressed={active}
-            className={`rounded-sm px-2 py-1 text-xs font-medium transition-colors ${
+            className={`flex-1 rounded-sm px-2 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
               active
                 ? "bg-accent text-on-accent"
                 : "text-ink-muted hover:bg-surface-muted hover:text-ink"

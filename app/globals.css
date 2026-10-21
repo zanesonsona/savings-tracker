@@ -14,13 +14,26 @@
 :root {
   color-scheme: light;
   --surface: #ffffff; /* cards, inputs, nav */
-  --surface-muted: #f8fafc; /* page background, hovers, neutral chips */
-  --ink: #0f172a; /* primary text */
-  --ink-muted: #64748b; /* secondary text, placeholders */
-  --line: #e2e8f0; /* borders & dividers */
-  --accent: #0f172a; /* primary actions, active nav */
-  --accent-hover: #334155;
-  --on-accent: #ffffff; /* text on accent surfaces */
+  --surface-raised: #ffffff; /* dialogs, toasts, floating panels */
+  --surface-muted: #f4f8f6; /* page background, hovers, neutral chips */
+  --ink: #0b1f17; /* primary text — green-tinted near-black */
+  --ink-muted: #5b6f67; /* secondary text, placeholders */
+  --line: #dfe9e4; /* borders & dividers */
+  --brand: #047857; /* emerald-700 — the T34 brand accent */
+  --brand-hover: #065f46;
+  --brand-soft: #ecfdf5;
+  --brand-border: #a7f3d0;
+  --on-brand: #ffffff;
+  --accent: var(--brand); /* legacy semantic alias — primary actions, active nav */
+  --accent-hover: var(--brand-hover);
+  --on-accent: var(--on-brand);
+  --overlay: rgb(6 24 18 / 0.52); /* dialog backdrop */
+  --hero-from: #047857; /* dashboard wallet hero gradient */
+  --hero-to: #064e3b;
+  --on-hero: #ffffff;
+  --hero-danger-from: #b91c1c;
+  --hero-danger-to: #7f1d1d;
+  --on-hero-danger: #fef2f2;
   --success: #047857;
   --success-soft: #ecfdf5;
   --success-border: #a7f3d0;
@@ -30,6 +43,20 @@
   --danger: #dc2626;
   --danger-soft: #fef2f2;
   --danger-border: #fecaca;
+
+  /* Hand-rolled chart palette (D22/D25) — six categorical colors + neutral. */
+  --chart-1: #059669;
+  --chart-2: #0284c7;
+  --chart-3: #d97706;
+  --chart-4: #7c3aed;
+  --chart-5: #e11d48;
+  --chart-6: #475569;
+  --chart-other: #94a3b8;
+
+  /* Elevation: soft, green-tinted shadows rather than hard grey drop shadows. */
+  --shadow-panel: 0 1px 2px rgb(6 24 18 / 0.04), 0 10px 28px -18px rgb(6 24 18 / 0.22);
+  --shadow-raised: 0 1px 2px rgb(6 24 18 / 0.05), 0 20px 48px -24px rgb(6 24 18 / 0.35);
+  --shadow-dialog: 0 28px 80px -32px rgb(6 24 18 / 0.55);
 }
 
 /*
@@ -40,14 +67,27 @@
  */
 .dark {
   color-scheme: dark;
-  --surface: #1e293b; /* slate-800 */
-  --surface-muted: #0f172a; /* slate-900 */
-  --ink: #f1f5f9; /* slate-100 */
-  --ink-muted: #94a3b8; /* slate-400 */
-  --line: #334155; /* slate-700 */
-  --accent: #f1f5f9; /* slate-100 */
-  --accent-hover: #cbd5e1; /* slate-300 */
-  --on-accent: #0f172a; /* slate-900 */
+  --surface: #17251f; /* one step above the page — deep green slate */
+  --surface-raised: #1d2f27; /* dialogs, toasts */
+  --surface-muted: #0d1814; /* page background */
+  --ink: #ecfdf5; /* emerald-50 */
+  --ink-muted: #9bb0a8; /* green-grey */
+  --line: #2b4138;
+  --brand: #34d399; /* emerald-400 — brighter for dark surfaces */
+  --brand-hover: #6ee7b7;
+  --brand-soft: #064e3b;
+  --brand-border: #065f46;
+  --on-brand: #052e22;
+  --accent: var(--brand);
+  --accent-hover: var(--brand-hover);
+  --on-accent: var(--on-brand);
+  --overlay: rgb(2 10 7 / 0.72);
+  --hero-from: #065f46;
+  --hero-to: #022c22;
+  --on-hero: #ecfdf5;
+  --hero-danger-from: #7f1d1d;
+  --hero-danger-to: #450a0a;
+  --on-hero-danger: #fef2f2;
   --success: #6ee7b7; /* emerald-300 */
   --success-soft: #064e3b; /* emerald-900 */
   --success-border: #065f46; /* emerald-800 */
@@ -57,6 +97,18 @@
   --danger: #fca5a5; /* red-300 */
   --danger-soft: #450a0a; /* red-950 */
   --danger-border: #7f1d1d; /* red-900 */
+
+  --chart-1: #34d399;
+  --chart-2: #38bdf8;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #fb7185;
+  --chart-6: #94a3b8;
+  --chart-other: #64748b;
+
+  --shadow-panel: 0 1px 0 rgb(255 255 255 / 0.03), 0 16px 32px -24px rgb(0 0 0 / 0.85);
+  --shadow-raised: 0 1px 0 rgb(255 255 255 / 0.04), 0 24px 56px -28px rgb(0 0 0 / 0.9);
+  --shadow-dialog: 0 32px 88px -32px rgb(0 0 0 / 0.95);
 }
 
 @theme inline {
@@ -64,10 +116,23 @@
   --font-mono: var(--font-geist-mono);
 
   --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
   --color-surface-muted: var(--surface-muted);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-border: var(--brand-border);
+  --color-on-brand: var(--on-brand);
+  --color-overlay: var(--overlay);
+  --color-hero-from: var(--hero-from);
+  --color-hero-to: var(--hero-to);
+  --color-on-hero: var(--on-hero);
+  --color-hero-danger-from: var(--hero-danger-from);
+  --color-hero-danger-to: var(--hero-danger-to);
+  --color-on-hero-danger: var(--on-hero-danger);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-on-accent: var(--on-accent);
@@ -80,9 +145,17 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-danger-border: var(--danger-border);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-other: var(--chart-other);
 
-  --radius-control: 0.375rem;
-  --radius-panel: 0.5rem;
+  --radius-control: 0.5rem;
+  --radius-panel: 0.875rem;
+  --radius-dialog: 1.25rem;
 }
 
 body {
@@ -100,17 +173,29 @@ body {
 /* Shared control styles (T30): one definition per control kind, consumed as
    short class names so buttons/inputs stay consistent across every screen. */
 @layer components {
+  .card {
+    @apply rounded-panel border border-line bg-surface;
+    box-shadow: var(--shadow-panel);
+  }
+  .card-raised {
+    @apply rounded-panel border border-line bg-surface-raised;
+    box-shadow: var(--shadow-raised);
+  }
+  .money {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-control bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-control bg-brand px-4 py-2 text-sm font-medium text-on-brand transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-control border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-control border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-danger {
-    @apply inline-flex items-center justify-center rounded-control border border-danger-border bg-surface px-3 py-1.5 text-sm font-medium text-danger transition-colors hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-control border border-danger-border bg-surface px-3 py-1.5 text-sm font-medium text-danger transition-colors hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-50;
   }
   .field {
-    @apply rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50;
+    @apply rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none disabled:cursor-not-allowed disabled:opacity-50;
   }
   .alert-danger {
     @apply rounded-control border border-danger-border bg-danger-soft px-3 py-2 text-sm text-danger;
@@ -135,5 +220,82 @@ body {
   }
   .badge-danger {
     @apply bg-danger-soft text-danger;
+  }
+  .icon-button {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-control text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink;
+  }
+  .input-label {
+    @apply block text-sm font-medium text-ink;
+  }
+  .field-hint {
+    @apply mt-1 text-xs text-ink-muted;
+  }
+}
+
+/* T34 — native <dialog> surfaces share the token layer (ConfirmDialog and the
+   page-level modals/sheets added in T37). */
+dialog::backdrop {
+  background: var(--overlay);
+  backdrop-filter: blur(2px);
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dialog-panel {
+  animation: dialog-in 160ms ease-out;
+}
+
+/* T37 — modal becomes a bottom sheet below the `sm` breakpoint. */
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 639px) {
+  .dialog-sheet {
+    animation: sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+/* T37 — route-level fade/slide. Applied per pathname in AppShell. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-in {
+  animation: page-in 220ms ease-out;
+}
+
+/* Respect the user's motion preference everywhere (D22/D26). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }

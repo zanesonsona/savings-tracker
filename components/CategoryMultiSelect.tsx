@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "@/lib/icons";
 import type { CategoryKind } from "@/lib/types";
 
 export interface CategoryOption {
@@ -45,7 +46,8 @@ export default function CategoryMultiSelect({
           Clear
         </button>
       ) : (
-        <span className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-on-accent">
+        <span className="inline-flex items-center gap-1 rounded-full bg-brand px-3 py-1 text-xs font-medium text-on-brand">
+          <Check aria-hidden="true" className="h-3 w-3" />
           All
         </span>
       )}
@@ -59,14 +61,16 @@ export default function CategoryMultiSelect({
             aria-pressed={active}
             className={
               active
-                ? "rounded-full bg-accent px-3 py-1 text-xs font-medium text-on-accent transition-colors"
-                : "rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-ink transition-colors hover:bg-surface-muted"
+                ? "inline-flex items-center gap-1 rounded-full bg-brand px-3 py-1 text-xs font-medium text-on-brand transition-colors"
+                : "inline-flex items-center gap-1 rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-ink transition-colors hover:bg-surface-muted"
             }
           >
-            {option.color ? (
+            {active ? (
+              <Check aria-hidden="true" className="h-3 w-3" />
+            ) : option.color ? (
               <span
-                aria-hidden
-                className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
+                aria-hidden="true"
+                className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: option.color }}
               />
             ) : null}

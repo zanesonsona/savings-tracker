@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
-import Nav from "@/components/Nav";
+import AppShell from "@/components/AppShell";
 import { getSessionUser } from "@/lib/auth";
 
 // The app shell reads the session (T25): signed-out visitors (e.g. a stale
@@ -22,9 +22,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   if (!user || user.status !== "APPROVED") redirect("/login");
 
   return (
-    <>
-      <Nav user={{ username: user.username, role: user.role }} />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
-    </>
+    <AppShell user={{ username: user.username, role: user.role }}>{children}</AppShell>
   );
 }

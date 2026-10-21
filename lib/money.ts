@@ -36,6 +36,18 @@ export function formatCents(cents: number): string {
   }).format(cents / 100);
 }
 
+/** The configured currency's symbol (e.g. "₱"), for compact form prefixes. */
+export function currencySymbol(): string {
+  return (
+    new Intl.NumberFormat(APP_LOCALE, {
+      style: "currency",
+      currency: APP_CURRENCY,
+    })
+      .formatToParts(0)
+      .find((part) => part.type === "currency")?.value ?? APP_CURRENCY
+  );
+}
+
 /** Format basis points as a trimmed percentage string, e.g. 10550 → "105.5". */
 export function formatPercentBp(bp: number): string {
   return Number((bp / 100).toFixed(2)).toString();

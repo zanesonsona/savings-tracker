@@ -74,6 +74,13 @@ export interface OverviewCategoryDTO {
   progress: number;
 }
 
+export interface OverviewTrendPoint {
+  month: string;
+  incomeTotalCents: number;
+  spentCents: number;
+  netSavedCents: number;
+}
+
 export interface OverviewResponse {
   month: string;
   incomeTotalCents: number;
@@ -86,6 +93,8 @@ export interface OverviewResponse {
   /** All-time cash on hand: income − expenses − savings net (D18/T28); may be negative. */
   walletBalanceCents: number;
   savingsBalanceCents: number;
+  /** Present only when the request asked for `?trend=N` (T36/D25). */
+  trend?: OverviewTrendPoint[];
 }
 
 export interface ApiError {
